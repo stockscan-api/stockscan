@@ -1,6 +1,7 @@
 'use client';
 
-const API_BASE_URL = 'https://854b26c05.na105.preview.abacusai.app';
+// Use proxy to avoid CORS issues - requests go through /api/proxy/* to the backend
+const API_BASE_URL = '/api/proxy';
 
 class ApiClient {
   private getToken(): string | null {
