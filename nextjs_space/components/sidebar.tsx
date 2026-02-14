@@ -71,7 +71,7 @@ export function Sidebar() {
           <div className="p-6 border-b border-slate-700">
             <Link href="/dashboard" className="flex items-center gap-3">
               <Warehouse className="h-8 w-8 text-blue-400" />
-              <span className="text-xl font-bold">Inventory Pro</span>
+              <span className="text-xl font-bold">StockScan</span>
             </Link>
           </div>
 

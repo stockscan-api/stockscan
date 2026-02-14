@@ -9,15 +9,15 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
-  title: 'Inventory Pro - Inventory Management Dashboard',
-  description: 'Comprehensive inventory management system for tracking products, suppliers, and stock levels.',
+  title: 'StockScan - Inventory Management Dashboard',
+  description: 'Smart inventory management system with barcode scanning for tracking products, suppliers, and stock levels.',
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
   },
   openGraph: {
-    title: 'Inventory Pro - Inventory Management Dashboard',
-    description: 'Comprehensive inventory management system for tracking products, suppliers, and stock levels.',
+    title: 'StockScan - Inventory Management Dashboard',
+    description: 'Smart inventory management system with barcode scanning for tracking products, suppliers, and stock levels.',
     images: ['/og-image.png'],
   },
 };

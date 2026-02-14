@@ -61,7 +61,7 @@ export default function LoginPage() {
             <Warehouse className="h-8 w-8 text-blue-600" />
           </div>
           <CardTitle className="text-2xl">Welcome Back</CardTitle>
-          <CardDescription>Sign in to your Inventory Pro account</CardDescription>
+          <CardDescription>Sign in to your StockScan account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
