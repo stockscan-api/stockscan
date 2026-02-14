@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import {
@@ -12,8 +13,7 @@ import {
   Users,
   LogOut,
   Menu,
-  X,
-  Warehouse
+  X
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -70,7 +70,7 @@ export function Sidebar() {
           {/* Logo */}
           <div className="p-6 border-b border-slate-700">
             <Link href="/dashboard" className="flex items-center gap-3">
-              <Warehouse className="h-8 w-8 text-blue-400" />
+              <Image src="/logo.png" alt="StockScan" width={40} height={40} className="rounded-lg" />
               <span className="text-xl font-bold">StockScan</span>
             </Link>
           </div>

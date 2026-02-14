@@ -12,8 +12,8 @@ export const metadata: Metadata = {
   title: 'StockScan - Inventory Management Dashboard',
   description: 'Smart inventory management system with barcode scanning for tracking products, suppliers, and stock levels.',
   icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
   },
   openGraph: {
     title: 'StockScan - Inventory Management Dashboard',
