@@ -139,15 +139,20 @@ export default function LicenseKeysPage() {
   };
 
   const getStatusBadge = (license: LicenseKey) => {
-    const now = new Date();
-    const expiry = new Date(license.expiresAt);
-    
     if (license.isRedeemed) {
       return <Badge className="bg-blue-100 text-blue-800">Redeemed</Badge>;
     }
-    if (expiry < now) {
-      return <Badge className="bg-red-100 text-red-800">Expired</Badge>;
+    
+    // Only check expiry if expiresAt is valid
+    if (license.expiresAt) {
+      const now = new Date();
+      const expiry = new Date(license.expiresAt);
+      // Check if date is valid (not NaN)
+      if (!isNaN(expiry.getTime()) && expiry < now) {
+        return <Badge className="bg-red-100 text-red-800">Expired</Badge>;
+      }
     }
+    
     return <Badge className="bg-green-100 text-green-800">Active</Badge>;
   };
 
