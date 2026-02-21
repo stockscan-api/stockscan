@@ -59,11 +59,11 @@ class ApiClient {
 
   // Auth
   async login(email: string, password: string) {
-    const response = await this.request<{ access_token: string; user: any }>('/api/auth/login', {
+    const response = await this.request<{ token: string; user: any }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    this.setToken(response.access_token);
+    this.setToken(response.token);
     if (typeof window !== 'undefined') {
       localStorage.setItem('user', JSON.stringify(response.user));
     }

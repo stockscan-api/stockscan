@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = 'https://stores.legwork.uk';
+const BACKEND_URL = 'https://api.stockscan.uk';
 
 async function proxyRequest(request: NextRequest, params: { path: string[] }) {
   const path = params.path.join('/');
