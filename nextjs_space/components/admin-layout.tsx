@@ -129,6 +129,11 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               <span className="font-medium">Logout</span>
             </button>
           </div>
+
+          {/* Copyright */}
+          <div className="px-4 pb-4 text-center">
+            <p className="text-xs text-slate-500">© 2026 StockScan. All rights reserved.</p>
+          </div>
         </div>
       </aside>
 

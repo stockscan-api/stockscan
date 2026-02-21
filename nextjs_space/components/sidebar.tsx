@@ -84,8 +84,8 @@ export function Sidebar() {
             </Link>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
+          {/* Navigation - scrollable */}
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {filteredNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
@@ -110,7 +110,7 @@ export function Sidebar() {
 
           {/* Admin Panel Link (Super Admin Only) */}
           {isSuperAdmin && (
-            <div className="p-4 border-t border-slate-700">
+            <div className="px-4 pb-2">
               <Link
                 href="/admin/dashboard"
                 onClick={() => setMobileOpen(false)}
@@ -138,6 +138,11 @@ export function Sidebar() {
               <LogOut className="h-5 w-5" />
               <span>Logout</span>
             </button>
+          </div>
+
+          {/* Copyright */}
+          <div className="px-4 pb-4 text-center">
+            <p className="text-xs text-slate-500">© 2026 StockScan. All rights reserved.</p>
           </div>
         </div>
       </aside>
