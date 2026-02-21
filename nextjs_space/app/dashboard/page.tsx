@@ -43,8 +43,17 @@ export default function DashboardPage() {
         apiClient.getTransactions({ limit: 15 }),
       ]);
 
-      const allProducts = productsRes?.data || productsRes || [];
-      const allTransactions = transactionsRes?.data || transactionsRes || [];
+      // Handle various API response formats
+      const extractArray = (res: any): any[] => {
+        if (Array.isArray(res)) return res;
+        if (Array.isArray(res?.data)) return res.data;
+        if (Array.isArray(res?.items)) return res.items;
+        if (Array.isArray(res?.products)) return res.products;
+        return [];
+      };
+      
+      const allProducts = extractArray(productsRes);
+      const allTransactions = extractArray(transactionsRes);
 
       setProducts(allProducts);
       setTransactions(allTransactions);
