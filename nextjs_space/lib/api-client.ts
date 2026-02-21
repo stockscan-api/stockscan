@@ -342,6 +342,97 @@ class ApiClient {
   async getProfile() {
     return this.request<any>('/api/auth/profile');
   }
+
+  // ============ SUPER ADMIN APIs ============
+
+  // Admin Dashboard
+  async getAdminDashboard() {
+    return this.request<any>('/api/admin/dashboard');
+  }
+
+  // Company Management
+  async getCompanies(params?: { page?: number; limit?: number; search?: string; status?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.search) searchParams.append('search', params.search);
+    if (params?.status) searchParams.append('status', params.status);
+    const query = searchParams.toString();
+    return this.request<any>(`/api/admin/companies${query ? `?${query}` : ''}`);
+  }
+
+  async getCompany(id: string) {
+    return this.request<any>(`/api/admin/companies/${id}`);
+  }
+
+  async suspendCompany(id: string) {
+    return this.request<any>(`/api/admin/companies/${id}/suspend`, { method: 'PATCH' });
+  }
+
+  async activateCompany(id: string) {
+    return this.request<any>(`/api/admin/companies/${id}/activate`, { method: 'PATCH' });
+  }
+
+  async deleteCompany(id: string) {
+    return this.request<void>(`/api/admin/companies/${id}`, { method: 'DELETE' });
+  }
+
+  // License Key Management (Admin)
+  async generateLicenseKeys(data: { tier: string; duration: number; notes?: string; count: number }) {
+    return this.request<any>('/license/generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAllLicenseKeys(params?: { page?: number; limit?: number; tier?: string; status?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.tier) searchParams.append('tier', params.tier);
+    if (params?.status) searchParams.append('status', params.status);
+    const query = searchParams.toString();
+    return this.request<any>(`/license/all${query ? `?${query}` : ''}`);
+  }
+
+  async checkLicenseKey(key: string) {
+    return this.request<any>(`/license/check/${key}`);
+  }
+
+  async deleteLicenseKey(id: string) {
+    return this.request<void>(`/license/${id}`, { method: 'DELETE' });
+  }
+
+  // Audit Logs
+  async getAuditLogs(params?: { page?: number; limit?: number; companyId?: string; action?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.companyId) searchParams.append('companyId', params.companyId);
+    if (params?.action) searchParams.append('action', params.action);
+    const query = searchParams.toString();
+    return this.request<any>(`/api/admin/audit-logs${query ? `?${query}` : ''}`);
+  }
+
+  // Super Admin Management
+  async getSuperAdmins() {
+    return this.request<any>('/api/admin/super-admins');
+  }
+
+  async createSuperAdmin(data: { email: string; name: string; password: string }) {
+    return this.request<any>('/api/admin/super-admins', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async activateSuperAdmin(id: string) {
+    return this.request<any>(`/api/admin/super-admins/${id}/activate`, { method: 'PATCH' });
+  }
+
+  async deactivateSuperAdmin(id: string) {
+    return this.request<any>(`/api/admin/super-admins/${id}/deactivate`, { method: 'PATCH' });
+  }
 }
 
 export const apiClient = new ApiClient();

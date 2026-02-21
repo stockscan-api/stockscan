@@ -11,6 +11,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   hasRole: (roles: UserRole[]) => boolean;
+  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,6 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return roles.includes(user.role);
   }, [user]);
 
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
   if (!mounted) {
     return <div className="min-h-screen bg-gray-50" />;
   }
@@ -58,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         hasRole,
+        isSuperAdmin,
       }}
     >
       {children}

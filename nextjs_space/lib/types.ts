@@ -1,6 +1,6 @@
 // API Types for Inventory Management System
 
-export type UserRole = 'STAFF' | 'MANAGER' | 'OWNER';
+export type UserRole = 'STAFF' | 'MANAGER' | 'OWNER' | 'SUPER_ADMIN';
 
 export interface Company {
   id: string;
@@ -8,7 +8,18 @@ export interface Company {
   email?: string;
   phone?: string;
   address?: string;
+  subscriptionTier?: 'FREE' | 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE';
+  subscriptionStatus?: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED';
+  subscriptionEndDate?: string;
+  activeLicenseKey?: string;
   isActive: boolean;
+  createdAt?: string;
+  _count?: {
+    users: number;
+    products: number;
+    suppliers?: number;
+  };
+  users?: User[];
 }
 
 export interface User {
@@ -111,3 +122,86 @@ export interface ApiError {
   message: string;
   error?: string;
 }
+
+// Admin Types
+export interface AdminDashboardStats {
+  totalCompanies: number;
+  activeCompanies: number;
+  suspendedCompanies: number;
+  totalUsers: number;
+  recentCompanies: number;
+}
+
+export interface LicenseKey {
+  id: string;
+  key: string;
+  tier: 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE';
+  duration: number;
+  isRedeemed: boolean;
+  redeemedBy?: string;
+  redeemedAt?: string;
+  generatedBy?: string;
+  notes?: string;
+  createdAt: string;
+  expiresAt: string;
+  company?: {
+    name: string;
+    email: string;
+  };
+}
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  details: string;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    email: string;
+    name: string;
+    role: UserRole;
+  };
+  company?: {
+    id: string;
+    name: string;
+  };
+}
+
+export const AUDIT_ACTIONS = [
+  'COMPANY_CREATED',
+  'COMPANY_SUSPENDED',
+  'COMPANY_ACTIVATED',
+  'COMPANY_DELETED',
+  'LICENSE_GENERATED',
+  'LICENSE_ACTIVATED',
+  'LICENSE_DELETED',
+  'USER_CREATED',
+  'USER_ROLE_CHANGED',
+  'USER_DELETED',
+  'SUPER_ADMIN_CREATED',
+] as const;
+
+export const TIER_LIMITS = {
+  BASIC: {
+    products: 100,
+    users: 3,
+    locations: 1,
+    features: ['CSV Export'],
+  },
+  PROFESSIONAL: {
+    products: -1,
+    users: 10,
+    locations: 10,
+    features: ['CSV Export', 'Sage Integration', 'Advanced Reports'],
+  },
+  ENTERPRISE: {
+    products: -1,
+    users: -1,
+    locations: -1,
+    features: ['CSV Export', 'Sage Integration', 'Advanced Reports', 'API Access', 'Priority Support', 'Advanced Analytics'],
+  },
+};

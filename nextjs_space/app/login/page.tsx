@@ -12,7 +12,7 @@ import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading, isSuperAdmin } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -21,9 +21,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.replace('/dashboard');
+      // Redirect super admins to admin dashboard, others to regular dashboard
+      const redirectPath = isSuperAdmin ? '/admin/dashboard' : '/dashboard';
+      router.replace(redirectPath);
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, authLoading, isSuperAdmin, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,9 +33,12 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const response = await login(email, password);
       toast.success('Login successful!');
-      router.replace('/dashboard');
+      // Check if user is super admin from the login response
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const redirectPath = user?.role === 'SUPER_ADMIN' ? '/admin/dashboard' : '/dashboard';
+      router.replace(redirectPath);
     } catch (err: any) {
       setError(err?.message || 'Invalid email or password');
       toast.error(err?.message || 'Login failed');

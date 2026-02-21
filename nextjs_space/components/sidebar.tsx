@@ -17,7 +17,8 @@ import {
   Upload,
   UserPlus,
   CreditCard,
-  Settings
+  Settings,
+  Shield
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -37,7 +38,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout, hasRole, isSuperAdmin } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const filteredNavItems = navItems.filter(item => 
@@ -106,6 +107,20 @@ export function Sidebar() {
               );
             })}
           </nav>
+
+          {/* Admin Panel Link (Super Admin Only) */}
+          {isSuperAdmin && (
+            <div className="p-4 border-t border-slate-700">
+              <Link
+                href="/admin/dashboard"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+              >
+                <Shield className="h-5 w-5" />
+                <span className="font-medium">Admin Panel</span>
+              </Link>
+            </div>
+          )}
 
           {/* User info & Logout */}
           <div className="p-4 border-t border-slate-700">
