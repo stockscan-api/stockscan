@@ -16,7 +16,8 @@ import {
   X,
   Upload,
   UserPlus,
-  CreditCard
+  CreditCard,
+  Settings
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -31,6 +32,7 @@ const navItems = [
   { href: '/invitations', label: 'Invitations', icon: UserPlus, roles: ['MANAGER', 'OWNER'] },
   { href: '/users', label: 'Users', icon: Users, roles: ['OWNER'] },
   { href: '/subscription', label: 'Subscription', icon: CreditCard, roles: ['STAFF', 'MANAGER', 'OWNER'] },
+  { href: '/settings', label: 'Settings', icon: Settings, roles: ['STAFF', 'MANAGER', 'OWNER'] },
 ];
 
 export function Sidebar() {

@@ -5,7 +5,8 @@ import { DashboardLayout } from '@/components/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api-client';
-import { Package, AlertTriangle, Truck, DollarSign, TrendingUp, TrendingDown, ArrowRightLeft, Loader2 } from 'lucide-react';
+import { useCurrency } from '@/contexts/currency-context';
+import { Package, AlertTriangle, Truck, Banknote, TrendingUp, TrendingDown, ArrowRightLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
@@ -25,6 +26,7 @@ import {
 const COLORS = ['#60B5FF', '#FF9149', '#FF9898', '#FF90BB', '#80D8C3', '#A19AD3'];
 
 export default function DashboardPage() {
+  const { formatPrice } = useCurrency();
   const [stats, setStats] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -163,11 +165,11 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-gray-500">Total Stock Value</p>
                   <p className="text-3xl font-bold text-green-600">
-                    ${(stats?.totalValue || 0)?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatPrice(stats?.totalValue || 0)}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <DollarSign className="h-6 w-6 text-green-600" />
+                  <Banknote className="h-6 w-6 text-green-600" />
                 </div>
               </div>
             </CardContent>

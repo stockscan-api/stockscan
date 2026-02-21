@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
 import { apiClient } from '@/lib/api-client';
+import { useCurrency } from '@/contexts/currency-context';
 import { Plus, Search, Edit, Trash2, Package, Filter, QrCode, Loader2, X, Grid, List } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'next/navigation';
@@ -46,6 +47,7 @@ interface FormData {
 
 export default function ProductsPage() {
   const searchParams = useSearchParams();
+  const { formatPrice, currency } = useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -228,7 +230,7 @@ export default function ProductsPage() {
       key: 'price',
       header: 'Price',
       render: (product: Product) => (
-        <span className="font-medium">${(product?.price || 0)?.toFixed?.(2)}</span>
+        <span className="font-medium">{formatPrice(product?.price || 0)}</span>
       ),
     },
     {
@@ -431,7 +433,7 @@ export default function ProductsPage() {
                           <h3 className="font-semibold text-gray-900 mb-1">{product?.name}</h3>
                           <p className="text-sm text-gray-500 mb-2">SKU: {product?.sku}</p>
                           <p className="text-lg font-bold text-blue-600 mb-3">
-                            ${(product?.price || 0)?.toFixed?.(2)}
+                            {formatPrice(product?.price || 0)}
                           </p>
                           <div className="flex items-center gap-2">
                             <Button variant="outline" size="sm" className="flex-1" onClick={() => handleOpenModal(product)}>
@@ -486,7 +488,7 @@ export default function ProductsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Price *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Price ({currency.symbol}) *</label>
               <Input
                 type="number"
                 step="0.01"
