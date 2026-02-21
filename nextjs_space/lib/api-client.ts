@@ -25,9 +25,13 @@ class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = this.getToken();
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
       ...(options.headers || {}),
     };
+
+    // Only set Content-Type for non-FormData requests
+    if (!(options.body instanceof FormData)) {
+      (headers as Record<string, string>)['Content-Type'] = 'application/json';
+    }
 
     if (token) {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
@@ -52,6 +56,38 @@ class ApiClient {
     }
 
     // Handle empty responses
+    const text = await response.text();
+    if (!text) return {} as T;
+    return JSON.parse(text);
+  }
+
+  private async requestFormData<T>(endpoint: string, formData: FormData): Promise<T> {
+    const token = this.getToken();
+    const headers: HeadersInit = {};
+
+    if (token) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (response.status === 401) {
+      this.removeToken();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(error?.message || `Request failed with status ${response.status}`);
+    }
+
     const text = await response.text();
     if (!text) return {} as T;
     return JSON.parse(text);
@@ -167,7 +203,7 @@ class ApiClient {
     });
   }
 
-  // Transactions
+  // Transactions (Inventory)
   async getTransactions(params?: { page?: number; limit?: number; productId?: string; type?: string; startDate?: string; endDate?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
@@ -177,42 +213,38 @@ class ApiClient {
     if (params?.startDate) searchParams.append('startDate', params.startDate);
     if (params?.endDate) searchParams.append('endDate', params.endDate);
     const query = searchParams.toString();
-    return this.request<any>(`/api/transactions${query ? `?${query}` : ''}`);
+    return this.request<any>(`/api/inventory/transactions${query ? `?${query}` : ''}`);
   }
 
-  async createTransaction(data: { productId: string; quantity: number; type: 'IN' | 'OUT'; reason: string; notes?: string }) {
-    return this.request<any>('/api/transactions', {
+  async adjustStock(data: { productId: string; quantity: number; reason: string; notes?: string }) {
+    return this.request<any>('/api/inventory/adjust', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   // Users (Owner only)
-  async getUsers(params?: { page?: number; limit?: number }) {
-    const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
-    const query = searchParams.toString();
-    return this.request<any>(`/api/users${query ? `?${query}` : ''}`);
+  async getUsers() {
+    return this.request<any>('/api/users');
   }
 
-  async createUser(data: { email: string; password: string; name: string; role: string }) {
-    return this.request<any>('/api/users', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateUser(id: string, data: any) {
-    return this.request<any>(`/api/users/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
+  async updateUserRole(id: string, role: string) {
+    return this.request<any>(`/api/users/${id}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
     });
   }
 
   async deleteUser(id: string) {
     return this.request<void>(`/api/users/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    return this.request<any>('/api/users/change-password', {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword }),
     });
   }
 
@@ -223,7 +255,92 @@ class ApiClient {
 
   // Reorder
   async getReorderList() {
-    return this.request<any[]>('/api/reorder');
+    return this.request<any>('/api/reorders/list');
+  }
+
+  async generateReorderItems() {
+    return this.request<any>('/api/reorders/generate', { method: 'POST' });
+  }
+
+  async updateReorderItem(id: string, quantityToOrder: number) {
+    return this.request<any>(`/api/reorders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ quantityToOrder }),
+    });
+  }
+
+  async markItemsAsOrdered(reorderItemIds: string[]) {
+    return this.request<any>('/api/reorders/mark-ordered', {
+      method: 'POST',
+      body: JSON.stringify({ reorderItemIds }),
+    });
+  }
+
+  async exportReorderCSV(supplierId?: string) {
+    const token = this.getToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const query = supplierId ? `?supplierId=${supplierId}` : '';
+    const response = await fetch(`${API_BASE_URL}/api/reorders/export${query}`, { headers });
+    return response.text();
+  }
+
+  // Invitations
+  async getInvitations() {
+    return this.request<any>('/api/invitations');
+  }
+
+  async createInvitation(data: { email?: string; role: string; expiresInDays?: number }) {
+    return this.request<any>('/api/invitations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteInvitation(id: string) {
+    return this.request<void>(`/api/invitations/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // License / Subscription
+  async activateLicense(licenseKey: string) {
+    return this.request<any>('/license/activate', {
+      method: 'POST',
+      body: JSON.stringify({ licenseKey }),
+    });
+  }
+
+  async getTierLimits() {
+    return this.request<any>('/license/limits');
+  }
+
+  async getSubscription() {
+    return this.request<any>('/subscriptions/my-subscription');
+  }
+
+  async getUsage() {
+    return this.request<any>('/subscriptions/usage');
+  }
+
+  // Import
+  async previewImport(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.requestFormData<any>('/import/products/preview', formData);
+  }
+
+  async importProducts(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.requestFormData<any>('/import/products', formData);
+  }
+
+  // Profile
+  async getProfile() {
+    return this.request<any>('/api/auth/profile');
   }
 }
 

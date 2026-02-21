@@ -6,14 +6,20 @@ async function proxyRequest(request: NextRequest, params: { path: string[] }) {
   const path = params.path.join('/');
   const url = `${BACKEND_URL}/${path}`;
   
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  const contentType = request.headers.get('Content-Type') || '';
+  const isFormData = contentType.includes('multipart/form-data');
+  
+  const headers: Record<string, string> = {};
   
   // Forward authorization header if present
   const authHeader = request.headers.get('Authorization');
   if (authHeader) {
     headers['Authorization'] = authHeader;
+  }
+  
+  // Set content type for non-FormData requests
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json';
   }
   
   const fetchOptions: RequestInit = {
@@ -24,9 +30,15 @@ async function proxyRequest(request: NextRequest, params: { path: string[] }) {
   // Add body for non-GET requests
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     try {
-      const body = await request.text();
-      if (body) {
-        fetchOptions.body = body;
+      if (isFormData) {
+        // For file uploads, forward the FormData as-is
+        const formData = await request.formData();
+        fetchOptions.body = formData;
+      } else {
+        const body = await request.text();
+        if (body) {
+          fetchOptions.body = body;
+        }
       }
     } catch (e) {
       // No body

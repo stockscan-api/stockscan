@@ -110,10 +110,13 @@ export default function TransactionsPage() {
     setIsSubmitting(true);
 
     try {
-      await apiClient.createTransaction({
+      const qty = parseInt(formData.quantity) || 0;
+      // For OUT transactions, send negative quantity
+      const adjustedQty = formData.type === 'OUT' ? -qty : qty;
+      
+      await apiClient.adjustStock({
         productId: formData.productId,
-        quantity: parseInt(formData.quantity) || 0,
-        type: formData.type,
+        quantity: adjustedQty,
         reason: formData.reason,
         notes: formData.notes || undefined,
       });

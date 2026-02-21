@@ -13,7 +13,10 @@ import {
   Users,
   LogOut,
   Menu,
-  X
+  X,
+  Upload,
+  UserPlus,
+  CreditCard
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -24,7 +27,10 @@ const navItems = [
   { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/suppliers', label: 'Suppliers', icon: Truck, roles: ['MANAGER', 'OWNER'] },
   { href: '/reorder', label: 'Reorder', icon: ClipboardList, roles: ['MANAGER', 'OWNER'] },
+  { href: '/import', label: 'Import', icon: Upload, roles: ['MANAGER', 'OWNER'] },
+  { href: '/invitations', label: 'Invitations', icon: UserPlus, roles: ['MANAGER', 'OWNER'] },
   { href: '/users', label: 'Users', icon: Users, roles: ['OWNER'] },
+  { href: '/subscription', label: 'Subscription', icon: CreditCard, roles: ['STAFF', 'MANAGER', 'OWNER'] },
 ];
 
 export function Sidebar() {
