@@ -99,7 +99,11 @@ export default function JobCardsPage() {
       setJobCards(cards);
     } catch (error: any) {
       console.error('Error fetching job cards:', error);
-      toast.error(error.message || 'Failed to load job cards');
+      // Don't show toast for 404 - just show empty state
+      if (!error.message?.includes('Cannot GET') && !error.message?.includes('404')) {
+        toast.error(error.message || 'Failed to load job cards');
+      }
+      setJobCards([]);
     } finally {
       setLoading(false);
     }
@@ -141,7 +145,11 @@ export default function JobCardsPage() {
       setFormData({ title: '', description: '', customerName: '', priority: 'MEDIUM', assignedToUserId: '' });
       fetchJobCards();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create job card');
+      if (error.message?.includes('Cannot') || error.message?.includes('404')) {
+        toast.error('Job Cards feature is not available yet. Backend API support pending.');
+      } else {
+        toast.error(error.message || 'Failed to create job card');
+      }
     } finally {
       setCreating(false);
     }

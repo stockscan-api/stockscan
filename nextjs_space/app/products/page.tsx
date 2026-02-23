@@ -103,13 +103,15 @@ export default function ProductsPage() {
   const fetchFilters = useCallback(async () => {
     try {
       const [cats, supps] = await Promise.all([
-        apiClient.getCategories(),
-        apiClient.getSuppliers({ limit: 100 }),
+        apiClient.getCategories().catch(() => []),
+        apiClient.getSuppliers({ limit: 100 }).catch(() => ({ data: [] })),
       ]);
-      setCategories(cats || []);
-      setSuppliers(supps?.data || supps || []);
+      setCategories(Array.isArray(cats) ? cats : []);
+      setSuppliers(Array.isArray(supps?.data) ? supps.data : Array.isArray(supps) ? supps : []);
     } catch (error) {
       console.error('Failed to fetch filters');
+      setCategories([]);
+      setSuppliers([]);
     }
   }, []);
 

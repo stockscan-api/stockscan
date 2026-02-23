@@ -130,11 +130,16 @@ export default function JobCardDetailPage() {
       });
     } catch (error: any) {
       console.error('Error fetching job card:', error);
-      toast.error(error.message || 'Failed to load job card');
+      if (error.message?.includes('Cannot') || error.message?.includes('404')) {
+        toast.error('Job Cards feature is not available yet');
+        router.push('/job-cards');
+      } else {
+        toast.error(error.message || 'Failed to load job card');
+      }
     } finally {
       setLoading(false);
     }
-  }, [jobCardId]);
+  }, [jobCardId, router]);
 
   const fetchStockItems = useCallback(async () => {
     try {

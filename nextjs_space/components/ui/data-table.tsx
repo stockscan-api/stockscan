@@ -32,7 +32,7 @@ export function DataTable<T>({
   isLoading,
   emptyMessage = 'No data found',
 }: DataTableProps<T>) {
-  const safeData = data ?? [];
+  const safeData = Array.isArray(data) ? data : [];
 
   return (
     <div className="w-full">
