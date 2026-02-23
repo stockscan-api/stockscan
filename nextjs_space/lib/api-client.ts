@@ -530,6 +530,42 @@ class ApiClient {
   async getLocations() {
     return this.request<any[]>('/api/locations');
   }
+
+  // ========== Labour Tracking ==========
+
+  // Add labour entry to job card
+  async addLabourEntry(jobCardId: string, data: {
+    staffMemberId: string;
+    hoursWorked: number;
+    hourlyRate: number;
+    dateWorked: string;
+    description?: string;
+  }) {
+    return this.request<any>(`/job-cards/${jobCardId}/labour`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Update labour entry
+  async updateLabourEntry(jobCardId: string, labourId: string, data: {
+    hoursWorked?: number;
+    hourlyRate?: number;
+    dateWorked?: string;
+    description?: string;
+  }) {
+    return this.request<any>(`/job-cards/${jobCardId}/labour/${labourId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Delete labour entry
+  async deleteLabourEntry(jobCardId: string, labourId: string) {
+    return this.request<any>(`/job-cards/${jobCardId}/labour/${labourId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

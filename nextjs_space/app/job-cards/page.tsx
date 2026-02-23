@@ -24,12 +24,13 @@ import Link from 'next/link';
 
 interface JobCard {
   id: string;
+  jobReference?: string; // Custom or auto-generated (e.g., AWL-JOB-001)
   jobName: string; // Backend field
   title?: string; // Alias for compatibility
   description?: string;
   customerName?: string;
   startDate?: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'OPEN';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   assignedToUserId?: string;
   assignedTo?: { id: string; name: string; email: string };
@@ -37,6 +38,9 @@ interface JobCard {
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
+  materialsCost?: string;
+  labourCost?: string;
+  totalCost?: string;
 }
 
 interface User {
@@ -46,7 +50,8 @@ interface User {
   role: string;
 }
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
+  OPEN: { label: 'Open', color: 'bg-blue-100 text-blue-700', icon: Clock },
   PENDING: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
   IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-100 text-blue-700', icon: Loader2 },
   COMPLETED: { label: 'Completed', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
@@ -74,8 +79,9 @@ export default function JobCardsPage() {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [showMyJobs, setShowMyJobs] = useState(false);
 
-  // Create form - Backend uses jobName, customerName, startDate
+  // Create form - Backend uses jobName, customerName, startDate, jobReference (optional)
   const [formData, setFormData] = useState({
+    jobReference: '', // Optional custom reference (e.g., SMITH-KITCHEN-2024)
     jobName: '',
     description: '',
     customerName: '',
@@ -138,15 +144,21 @@ export default function JobCardsPage() {
 
     try {
       setCreating(true);
-      // Backend only accepts: jobName, customerName, startDate
-      await apiClient.createJobCard({
+      // Backend accepts: jobName, customerName, startDate, jobReference (optional)
+      const payload: any = {
         jobName: formData.jobName,
         customerName: formData.customerName,
         startDate: new Date(formData.startDate).toISOString(),
-      });
+      };
+      // Include jobReference only if provided (otherwise auto-generated)
+      if (formData.jobReference.trim()) {
+        payload.jobReference = formData.jobReference.trim();
+      }
+      await apiClient.createJobCard(payload);
       toast.success('Job card created successfully');
       setShowCreateModal(false);
       setFormData({ 
+        jobReference: '',
         jobName: '', 
         description: '', 
         customerName: '', 
@@ -277,15 +289,17 @@ export default function JobCardsPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        {card.jobReference && (
+                          <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{card.jobReference}</span>
+                        )}
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig[card.status]?.color || 'bg-gray-100 text-gray-700'}`}>
+                          <StatusIcon className="h-3 w-3" />
+                          {statusConfig[card.status]?.label || card.status}
+                        </span>
+                      </div>
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900 truncate">{card.jobName || card.title}</h3>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig[card.status]?.color}`}>
-                          <StatusIcon className="h-3 w-3" />
-                          {statusConfig[card.status]?.label}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${priorityConfig[card.priority]?.color}`}>
-                          {priorityConfig[card.priority]?.label}
-                        </span>
                       </div>
                       {card.description && (
                         <p className="text-gray-600 text-sm mb-3 line-clamp-2">{card.description}</p>
@@ -330,6 +344,19 @@ export default function JobCardsPage() {
                 </div>
               </div>
               <form onSubmit={handleCreateJobCard} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Job Reference <span className="text-gray-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.jobReference}
+                    onChange={(e) => setFormData({ ...formData, jobReference: e.target.value })}
+                    placeholder="Leave blank for auto-generated (e.g., AWL-JOB-001)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Custom reference like "SMITH-KITCHEN-2024" or leave empty for auto-generate</p>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Job Name *</label>
                   <input
