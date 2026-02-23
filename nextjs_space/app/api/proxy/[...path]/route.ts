@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = 'https://api.stockscan.uk';
 
-async function proxyRequest(request: NextRequest, params: { path: string[] }) {
-  const path = params.path.join('/');
+async function proxyRequest(request: NextRequest, pathSegments: string[]) {
+  const path = pathSegments.join('/');
   const url = `${BACKEND_URL}/${path}`;
   
   const contentType = request.headers.get('Content-Type') || '';
@@ -68,22 +68,42 @@ async function proxyRequest(request: NextRequest, params: { path: string[] }) {
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyRequest(request, params);
+export async function GET(
+  request: NextRequest, 
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  return proxyRequest(request, path);
 }
 
-export async function POST(request: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyRequest(request, params);
+export async function POST(
+  request: NextRequest, 
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  return proxyRequest(request, path);
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyRequest(request, params);
+export async function PUT(
+  request: NextRequest, 
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  return proxyRequest(request, path);
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyRequest(request, params);
+export async function PATCH(
+  request: NextRequest, 
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  return proxyRequest(request, path);
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { path: string[] } }) {
-  return proxyRequest(request, params);
+export async function DELETE(
+  request: NextRequest, 
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  return proxyRequest(request, path);
 }
