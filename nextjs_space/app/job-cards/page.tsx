@@ -24,9 +24,11 @@ import Link from 'next/link';
 
 interface JobCard {
   id: string;
-  title: string;
+  jobName: string; // Backend field
+  title?: string; // Alias for compatibility
   description?: string;
   customerName?: string;
+  startDate?: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   assignedToUserId?: string;
@@ -72,11 +74,12 @@ export default function JobCardsPage() {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [showMyJobs, setShowMyJobs] = useState(false);
 
-  // Create form
+  // Create form - Backend uses jobName, customerName, startDate
   const [formData, setFormData] = useState({
-    title: '',
+    jobName: '',
     description: '',
     customerName: '',
+    startDate: new Date().toISOString().split('T')[0], // Today's date
     priority: 'MEDIUM',
     assignedToUserId: ''
   });
@@ -95,14 +98,12 @@ export default function JobCardsPage() {
         });
       }
       
-      const cards = Array.isArray(response) ? response : (response?.data || response?.jobCards || []);
+      // API returns {jobCards: [...], pagination: {...}}
+      const cards = Array.isArray(response) ? response : (response?.jobCards || response?.data || []);
       setJobCards(cards);
     } catch (error: any) {
       console.error('Error fetching job cards:', error);
-      // Don't show toast for 404 - just show empty state
-      if (!error.message?.includes('Cannot GET') && !error.message?.includes('404')) {
-        toast.error(error.message || 'Failed to load job cards');
-      }
+      toast.error(error.message || 'Failed to load job cards');
       setJobCards([]);
     } finally {
       setLoading(false);
@@ -126,30 +127,38 @@ export default function JobCardsPage() {
 
   const handleCreateJobCard = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title.trim()) {
-      toast.error('Title is required');
+    if (!formData.jobName.trim()) {
+      toast.error('Job name is required');
+      return;
+    }
+    if (!formData.customerName.trim()) {
+      toast.error('Customer name is required');
       return;
     }
 
     try {
       setCreating(true);
       await apiClient.createJobCard({
-        title: formData.title,
+        jobName: formData.jobName,
+        customerName: formData.customerName,
+        startDate: new Date(formData.startDate).toISOString(),
         description: formData.description || undefined,
-        customerName: formData.customerName || undefined,
         priority: formData.priority,
         assignedToUserId: formData.assignedToUserId || undefined,
       });
       toast.success('Job card created successfully');
       setShowCreateModal(false);
-      setFormData({ title: '', description: '', customerName: '', priority: 'MEDIUM', assignedToUserId: '' });
+      setFormData({ 
+        jobName: '', 
+        description: '', 
+        customerName: '', 
+        startDate: new Date().toISOString().split('T')[0],
+        priority: 'MEDIUM', 
+        assignedToUserId: '' 
+      });
       fetchJobCards();
     } catch (error: any) {
-      if (error.message?.includes('Cannot') || error.message?.includes('404')) {
-        toast.error('Job Cards feature is not available yet. Backend API support pending.');
-      } else {
-        toast.error(error.message || 'Failed to create job card');
-      }
+      toast.error(error.message || 'Failed to create job card');
     } finally {
       setCreating(false);
     }
@@ -158,8 +167,10 @@ export default function JobCardsPage() {
   const filteredJobCards = jobCards.filter(card => {
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
+      // Backend uses jobName instead of title
+      const jobName = card.jobName || card.title || '';
       return (
-        card.title.toLowerCase().includes(search) ||
+        jobName.toLowerCase().includes(search) ||
         card.description?.toLowerCase().includes(search) ||
         card.customerName?.toLowerCase().includes(search)
       );
@@ -269,7 +280,7 @@ export default function JobCardsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">{card.title}</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 truncate">{card.jobName || card.title}</h3>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig[card.status]?.color}`}>
                           <StatusIcon className="h-3 w-3" />
                           {statusConfig[card.status]?.label}
@@ -322,12 +333,12 @@ export default function JobCardsPage() {
               </div>
               <form onSubmit={handleCreateJobCard} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Job Name *</label>
                   <input
                     type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="Enter job title"
+                    value={formData.jobName}
+                    onChange={(e) => setFormData({ ...formData, jobName: e.target.value })}
+                    placeholder="Enter job name"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
@@ -343,13 +354,24 @@ export default function JobCardsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name *</label>
                   <input
                     type="text"
                     value={formData.customerName}
                     onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
                     placeholder="Enter customer name"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date *</label>
+                  <input
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
