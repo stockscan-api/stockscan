@@ -433,6 +433,93 @@ class ApiClient {
   async deactivateSuperAdmin(id: string) {
     return this.request<any>(`/api/admin/super-admins/${id}/deactivate`, { method: 'PATCH' });
   }
+
+  // ============ JOB CARDS APIs ============
+
+  // Get all job cards
+  async getJobCards(params?: { page?: number; limit?: number; status?: string; priority?: string; assignedToUserId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.priority) searchParams.append('priority', params.priority);
+    if (params?.assignedToUserId) searchParams.append('assignedToUserId', params.assignedToUserId);
+    const query = searchParams.toString();
+    return this.request<any>(`/api/job-cards${query ? `?${query}` : ''}`);
+  }
+
+  // Get my assigned job cards
+  async getMyJobCards() {
+    return this.request<any>('/api/job-cards/my-jobs');
+  }
+
+  // Get single job card with allocations
+  async getJobCard(id: string) {
+    return this.request<any>(`/api/job-cards/${id}`);
+  }
+
+  // Create job card
+  async createJobCard(data: { title: string; description?: string; customerName?: string; priority?: string; assignedToUserId?: string }) {
+    return this.request<any>('/api/job-cards', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Update job card
+  async updateJobCard(id: string, data: { title?: string; description?: string; customerName?: string; priority?: string; status?: string; assignedToUserId?: string }) {
+    return this.request<any>(`/api/job-cards/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Delete job card
+  async deleteJobCard(id: string) {
+    return this.request<void>(`/api/job-cards/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Allocate stock to job card
+  async allocateStockToJob(jobCardId: string, data: { stockItemId: string; quantity: number }) {
+    return this.request<any>(`/api/job-cards/${jobCardId}/allocate-stock`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Return stock from job card
+  async returnStockFromJob(jobCardId: string, data: { stockItemId: string; quantity: number }) {
+    return this.request<any>(`/api/job-cards/${jobCardId}/return-stock`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Complete job card
+  async completeJobCard(id: string) {
+    return this.request<any>(`/api/job-cards/${id}/complete`, {
+      method: 'POST',
+    });
+  }
+
+  // Get stock items (for allocation)
+  async getStockItems(params?: { page?: number; limit?: number; search?: string; categoryId?: string; locationId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.search) searchParams.append('search', params.search);
+    if (params?.categoryId) searchParams.append('categoryId', params.categoryId);
+    if (params?.locationId) searchParams.append('locationId', params.locationId);
+    const query = searchParams.toString();
+    return this.request<any>(`/api/stock-items${query ? `?${query}` : ''}`);
+  }
+
+  // Get locations
+  async getLocations() {
+    return this.request<any[]>('/api/locations');
+  }
 }
 
 export const apiClient = new ApiClient();
