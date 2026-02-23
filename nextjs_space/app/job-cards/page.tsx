@@ -138,13 +138,11 @@ export default function JobCardsPage() {
 
     try {
       setCreating(true);
+      // Backend only accepts: jobName, customerName, startDate
       await apiClient.createJobCard({
         jobName: formData.jobName,
         customerName: formData.customerName,
         startDate: new Date(formData.startDate).toISOString(),
-        description: formData.description || undefined,
-        priority: formData.priority,
-        assignedToUserId: formData.assignedToUserId || undefined,
       });
       toast.success('Job card created successfully');
       setShowCreateModal(false);
