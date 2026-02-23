@@ -506,10 +506,11 @@ class ApiClient {
     });
   }
 
-  // Complete job card
-  async completeJobCard(id: string) {
-    return this.request<any>(`/job-cards/${id}/complete`, {
-      method: 'POST',
+  // Update job card status
+  async updateJobCardStatus(id: string, data: { status: string; actualCompletionDate?: string }) {
+    return this.request<any>(`/job-cards/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     });
   }
 

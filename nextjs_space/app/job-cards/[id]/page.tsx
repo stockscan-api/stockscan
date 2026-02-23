@@ -244,20 +244,16 @@ export default function JobCardDetailPage() {
   };
 
   const handleCompleteJob = async () => {
-    // Note: The /complete endpoint is not yet implemented on the backend
-    // Using PATCH to update status instead
     try {
       setUpdating(true);
-      await apiClient.updateJobCard(jobCardId, { status: 'CLOSED' });
+      await apiClient.updateJobCardStatus(jobCardId, { 
+        status: 'COMPLETED',
+        actualCompletionDate: new Date().toISOString()
+      });
       toast.success('Job marked as completed');
       fetchJobCard();
     } catch (error: any) {
-      // If backend doesn't accept status, show informative message
-      if (error.message?.includes('status should not exist')) {
-        toast.error('Complete feature not yet available - contact backend team');
-      } else {
-        toast.error(error.message || 'Failed to complete job');
-      }
+      toast.error(error.message || 'Failed to complete job');
     } finally {
       setUpdating(false);
     }
