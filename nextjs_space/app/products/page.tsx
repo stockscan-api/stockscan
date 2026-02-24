@@ -91,8 +91,10 @@ export default function ProductsPage() {
       if (filterLowStock) params.lowStock = true;
 
       const response = await apiClient.getProducts(params);
-      setProducts(response?.data || response || []);
-      setTotalPages(response?.totalPages || 1);
+      // Handle different API response formats: { products: [...] } or { data: [...] } or direct array
+      const productList = response?.products || response?.data || (Array.isArray(response) ? response : []);
+      setProducts(productList);
+      setTotalPages(response?.totalPages || Math.ceil((response?.total || productList.length) / 10) || 1);
     } catch (error) {
       toast.error('Failed to fetch products');
     } finally {
