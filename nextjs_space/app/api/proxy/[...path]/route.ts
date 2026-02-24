@@ -17,11 +17,6 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
     headers['Authorization'] = authHeader;
   }
   
-  // Set content type for non-FormData requests
-  if (!isFormData) {
-    headers['Content-Type'] = 'application/json';
-  }
-  
   const fetchOptions: RequestInit = {
     method: request.method,
     headers,
@@ -31,10 +26,26 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     try {
       if (isFormData) {
-        // For file uploads, forward the FormData as-is
-        const formData = await request.formData();
-        fetchOptions.body = formData;
+        // For file uploads, reconstruct FormData properly
+        const incomingFormData = await request.formData();
+        const outgoingFormData = new FormData();
+        
+        // Copy all entries from incoming to outgoing FormData
+        for (const [key, value] of incomingFormData.entries()) {
+          if (value instanceof File) {
+            // For files, create a new Blob with the file data
+            const arrayBuffer = await value.arrayBuffer();
+            const blob = new Blob([arrayBuffer], { type: value.type });
+            outgoingFormData.append(key, blob, value.name);
+          } else {
+            outgoingFormData.append(key, value);
+          }
+        }
+        
+        fetchOptions.body = outgoingFormData;
+        // Don't set Content-Type - let fetch set it with proper boundary
       } else {
+        headers['Content-Type'] = 'application/json';
         const body = await request.text();
         if (body) {
           fetchOptions.body = body;
@@ -43,6 +54,9 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
     } catch (e) {
       // No body
     }
+  } else {
+    // For GET/HEAD, still set JSON content type in headers
+    headers['Content-Type'] = 'application/json';
   }
   
   // Forward query parameters
