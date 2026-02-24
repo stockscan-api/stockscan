@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DataTable } from '@/components/ui/data-table';
 import { apiClient } from '@/lib/api-client';
-import { Plus, Search, Edit, Trash2, Truck, Mail, Phone, MapPin, User, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Truck, Mail, Phone, MapPin, User, Loader2, Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Supplier {
@@ -55,6 +55,19 @@ export default function SuppliersPage() {
     contactPerson: '',
     notes: '',
   });
+
+  // Import state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    imported: number;
+    updated: number;
+    skipped: number;
+    errors: Array<{ row: number; name: string; error: string }>;
+    total: number;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchSuppliers = useCallback(async () => {
     setIsLoading(true);
@@ -146,6 +159,63 @@ export default function SuppliersPage() {
     }
   };
 
+  // Import handlers
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
+      if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+        toast.error('Please select an Excel file (.xlsx or .xls)');
+        return;
+      }
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File size must be less than 10MB');
+        return;
+      }
+      setImportFile(file);
+      setImportResult(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      toast.error('Please select a file first');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportResult(null);
+
+    try {
+      const result = await apiClient.importSuppliers(importFile);
+      setImportResult(result);
+      
+      if (result.imported > 0 || result.updated > 0) {
+        toast.success(`Successfully processed ${result.imported + result.updated} suppliers`);
+        fetchSuppliers(); // Refresh the list
+      }
+      
+      if (result.errors && result.errors.length > 0) {
+        toast.error(`${result.errors.length} suppliers had errors`);
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to import suppliers');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const resetImportModal = () => {
+    setImportFile(null);
+    setImportResult(null);
+    setIsImportModalOpen(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const columns = [
     {
       key: 'name',
@@ -224,10 +294,16 @@ export default function SuppliersPage() {
             <h1 className="text-2xl font-bold text-gray-900">Suppliers</h1>
             <p className="text-gray-500">Manage your vendor relationships</p>
           </div>
-          <Button onClick={() => handleOpenModal()}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Supplier
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Import from Sage
+            </Button>
+            <Button onClick={() => handleOpenModal()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Supplier
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -348,6 +424,155 @@ export default function SuppliersPage() {
         confirmText="Delete"
         isLoading={isSubmitting}
       />
+
+      {/* Import Modal */}
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={resetImportModal}
+        title="Import Suppliers from Sage"
+        className="max-w-2xl"
+      >
+        <div className="space-y-6">
+          {/* Info Banner */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <FileSpreadsheet className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-blue-900">Sage 50 Supplier Export</h4>
+                <p className="text-sm text-blue-700 mt-1">
+                  Upload an Excel file (.xlsx or .xls) exported from Sage 50. The file should contain supplier data with columns for Name, Contact, Phone, Email, and Address.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* File Upload Area */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">Select File</label>
+            <div 
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                importFile ? 'border-green-300 bg-green-50' : 'border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="sage-file-input"
+              />
+              {importFile ? (
+                <div className="flex items-center justify-center gap-3">
+                  <FileSpreadsheet className="h-8 w-8 text-green-600" />
+                  <div className="text-left">
+                    <p className="font-medium text-gray-900">{importFile.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {(importFile.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setImportFile(null);
+                      setImportResult(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                  >
+                    <XCircle className="h-4 w-4 text-gray-500" />
+                  </Button>
+                </div>
+              ) : (
+                <label htmlFor="sage-file-input" className="cursor-pointer">
+                  <Upload className="h-10 w-10 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600">Click to select a file</p>
+                  <p className="text-sm text-gray-400 mt-1">Excel files only (.xlsx, .xls) • Max 10MB</p>
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* Import Results */}
+          {importResult && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-green-50 rounded-lg p-3 text-center">
+                  <CheckCircle className="h-5 w-5 text-green-600 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-green-700">{importResult.imported}</p>
+                  <p className="text-xs text-green-600">Imported</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3 text-center">
+                  <CheckCircle className="h-5 w-5 text-blue-600 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-blue-700">{importResult.updated}</p>
+                  <p className="text-xs text-blue-600">Updated</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <AlertCircle className="h-5 w-5 text-gray-500 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-gray-700">{importResult.skipped}</p>
+                  <p className="text-xs text-gray-500">Skipped</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3 text-center">
+                  <XCircle className="h-5 w-5 text-red-600 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-red-700">{importResult.errors?.length || 0}</p>
+                  <p className="text-xs text-red-600">Errors</p>
+                </div>
+              </div>
+
+              {/* Error Details */}
+              {importResult.errors && importResult.errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="font-medium text-red-900 mb-2">Import Errors</h4>
+                  <div className="max-h-40 overflow-y-auto space-y-2">
+                    {importResult.errors.slice(0, 10).map((error, idx) => (
+                      <div key={idx} className="text-sm text-red-700 flex gap-2">
+                        <span className="font-mono text-red-500">Row {error.row}:</span>
+                        <span>{error.name || 'Unknown'} - {error.error}</span>
+                      </div>
+                    ))}
+                    {importResult.errors.length > 10 && (
+                      <p className="text-sm text-red-500 italic">
+                        ... and {importResult.errors.length - 10} more errors
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button variant="outline" onClick={resetImportModal}>
+              {importResult ? 'Close' : 'Cancel'}
+            </Button>
+            {!importResult && (
+              <Button onClick={handleImport} disabled={!importFile || isImporting}>
+                {isImporting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import Suppliers
+                  </>
+                )}
+              </Button>
+            )}
+            {importResult && (
+              <Button onClick={() => {
+                setImportFile(null);
+                setImportResult(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+              }}>
+                Import Another File
+              </Button>
+            )}
+          </div>
+        </div>
+      </Modal>
     </DashboardLayout>
   );
 }

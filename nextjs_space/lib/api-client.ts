@@ -203,6 +203,19 @@ class ApiClient {
     });
   }
 
+  // Supplier Import from Sage
+  async importSuppliers(file: File): Promise<{
+    imported: number;
+    updated: number;
+    skipped: number;
+    errors: Array<{ row: number; name: string; error: string }>;
+    total: number;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.requestFormData('/api/suppliers/import', formData);
+  }
+
   // Transactions (Inventory)
   async getTransactions(params?: { page?: number; limit?: number; productId?: string; type?: string; startDate?: string; endDate?: string }) {
     const searchParams = new URLSearchParams();
