@@ -40,8 +40,10 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
-      const [productsRes, transactionsRes] = await Promise.all([
-        apiClient.getProducts({ limit: 100 }),
+      // Fetch products, low stock items separately, and transactions
+      const [productsRes, lowStockRes, transactionsRes] = await Promise.all([
+        apiClient.getProducts({ limit: 50 }),
+        apiClient.getProducts({ lowStock: true, limit: 50 }),
         apiClient.getTransactions({ limit: 15 }),
       ]);
 
@@ -54,21 +56,31 @@ export default function DashboardPage() {
         return [];
       };
       
+      // Extract total count from API response (handles different formats)
+      const extractTotal = (res: any, fallbackArray: any[]): number => {
+        if (typeof res?.total === 'number') return res.total;
+        if (typeof res?.totalCount === 'number') return res.totalCount;
+        if (typeof res?.count === 'number') return res.count;
+        return fallbackArray.length;
+      };
+      
       const allProducts = extractArray(productsRes);
+      const lowStockItems = extractArray(lowStockRes);
       const allTransactions = extractArray(transactionsRes);
+
+      // Get actual totals from API response
+      const totalProductsCount = extractTotal(productsRes, allProducts);
+      const lowStockCount = extractTotal(lowStockRes, lowStockItems);
 
       setProducts(allProducts);
       setTransactions(allTransactions);
+      setLowStockProducts(lowStockItems);
 
-      // Calculate low stock products
-      const lowStock = allProducts.filter((p: any) => p?.currentStock < p?.minimumStock);
-      setLowStockProducts(lowStock);
-
-      // Calculate stats
+      // Calculate stats using API totals
       const totalValue = allProducts.reduce((sum: number, p: any) => sum + ((p?.price || 0) * (p?.currentStock || 0)), 0);
       setStats({
-        totalProducts: allProducts?.length || 0,
-        lowStockCount: lowStock?.length || 0,
+        totalProducts: totalProductsCount,
+        lowStockCount: lowStockCount,
         totalValue,
       });
     } catch (error: any) {
