@@ -19,7 +19,8 @@ import {
   CreditCard,
   Settings,
   Shield,
-  Smartphone
+  Smartphone,
+  PackageCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/products', label: 'Products', icon: Package, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/job-cards', label: 'Job Cards', icon: ClipboardList, roles: ['STAFF', 'MANAGER', 'OWNER'] },
+  { href: '/deliveries', label: 'Deliveries', icon: PackageCheck, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/suppliers', label: 'Suppliers', icon: Truck, roles: ['MANAGER', 'OWNER'] },
   { href: '/import', label: 'Import', icon: Upload, roles: ['MANAGER', 'OWNER'] },
   { href: '/invitations', label: 'Invitations', icon: UserPlus, roles: ['MANAGER', 'OWNER'] },

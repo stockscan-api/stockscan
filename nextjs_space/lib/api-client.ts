@@ -579,6 +579,122 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // ============ DELIVERIES APIs ============
+
+  // Get all deliveries
+  async getDeliveries(params?: { page?: number; limit?: number; status?: string; search?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.search) searchParams.append('search', params.search);
+    const query = searchParams.toString();
+    return this.request<any>(`/deliveries${query ? `?${query}` : ''}`);
+  }
+
+  // Get single delivery
+  async getDelivery(id: string) {
+    return this.request<any>(`/deliveries/${id}`);
+  }
+
+  // Create delivery
+  async createDelivery(data: {
+    customerName: string;
+    deliveryAddress: string;
+    contactPhone?: string;
+    contactEmail?: string;
+    scheduledDate?: string;
+    notes?: string;
+    lineItems?: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+    }>;
+  }) {
+    return this.request<any>('/deliveries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Update delivery
+  async updateDelivery(id: string, data: {
+    customerName?: string;
+    deliveryAddress?: string;
+    contactPhone?: string;
+    contactEmail?: string;
+    scheduledDate?: string;
+    status?: string;
+    notes?: string;
+    signature?: string;
+    signedBy?: string;
+    completedAt?: string;
+  }) {
+    return this.request<any>(`/deliveries/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Delete delivery
+  async deleteDelivery(id: string) {
+    return this.request<void>(`/deliveries/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Add line item to delivery
+  async addDeliveryLineItem(deliveryId: string, data: {
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+  }) {
+    return this.request<any>(`/deliveries/${deliveryId}/line-items`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Update line item
+  async updateDeliveryLineItem(deliveryId: string, lineItemId: string, data: {
+    quantity?: number;
+    unitPrice?: number;
+  }) {
+    return this.request<any>(`/deliveries/${deliveryId}/line-items/${lineItemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Delete line item
+  async deleteDeliveryLineItem(deliveryId: string, lineItemId: string) {
+    return this.request<void>(`/deliveries/${deliveryId}/line-items/${lineItemId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Capture signature for delivery
+  async captureDeliverySignature(deliveryId: string, data: {
+    signature: string;
+    signedBy: string;
+  }) {
+    return this.request<any>(`/deliveries/${deliveryId}/signature`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Import Sales Orders from Sage
+  async importSalesOrders(file: File): Promise<{
+    imported: number;
+    errors: Array<{ row: number; error: string }>;
+    deliveryId?: string;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.requestFormData('/sage/import/sales-orders', formData);
+  }
 }
 
 export const apiClient = new ApiClient();
