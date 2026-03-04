@@ -600,6 +600,7 @@ class ApiClient {
   }
 
   // Create delivery (v1.2.25 spec)
+  // Backend accepts: productId, quantity, notes (no productCode, productName, unitPrice)
   async createDelivery(data: {
     customerName: string;
     customerEmail?: string;
@@ -607,11 +608,8 @@ class ApiClient {
     sageOrderReference?: string;
     deliveryDate?: string;
     items?: Array<{
-      productId?: string;
-      productCode?: string;
-      productName?: string;
+      productId: string;
       quantity: number;
-      unitPrice?: number;
       notes?: string;
     }>;
   }) {
