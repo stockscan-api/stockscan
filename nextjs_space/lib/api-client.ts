@@ -581,6 +581,7 @@ class ApiClient {
   }
 
   // ============ DELIVERIES APIs ============
+  // Based on v1.2.25 API spec: Status is PENDING | COLLECTED | CANCELLED
 
   // Get all deliveries
   async getDeliveries(params?: { page?: number; limit?: number; status?: string; search?: string }) {
@@ -590,29 +591,28 @@ class ApiClient {
     if (params?.status) searchParams.append('status', params.status);
     if (params?.search) searchParams.append('search', params.search);
     const query = searchParams.toString();
-    return this.request<any>(`/deliveries${query ? `?${query}` : ''}`);
+    return this.request<any>(`/api/deliveries${query ? `?${query}` : ''}`);
   }
 
   // Get single delivery
   async getDelivery(id: string) {
-    return this.request<any>(`/deliveries/${id}`);
+    return this.request<any>(`/api/deliveries/${id}`);
   }
 
-  // Create delivery
+  // Create delivery (v1.2.25 spec)
   async createDelivery(data: {
     customerName: string;
-    deliveryAddress: string;
-    contactPhone?: string;
-    contactEmail?: string;
-    scheduledDate?: string;
-    notes?: string;
-    lineItems?: Array<{
+    customerEmail?: string;
+    customerPhone?: string;
+    sageOrderReference?: string;
+    deliveryDate?: string;
+    items?: Array<{
       productId: string;
       quantity: number;
-      unitPrice: number;
+      notes?: string;
     }>;
   }) {
-    return this.request<any>('/deliveries', {
+    return this.request<any>('/api/deliveries', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -621,79 +621,125 @@ class ApiClient {
   // Update delivery
   async updateDelivery(id: string, data: {
     customerName?: string;
-    deliveryAddress?: string;
-    contactPhone?: string;
-    contactEmail?: string;
-    scheduledDate?: string;
-    status?: string;
-    notes?: string;
-    signature?: string;
-    signedBy?: string;
-    completedAt?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    sageOrderReference?: string;
+    deliveryDate?: string;
   }) {
-    return this.request<any>(`/deliveries/${id}`, {
+    return this.request<any>(`/api/deliveries/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  }
+
+  // Collect delivery with signature (v1.2.25 - PATCH /api/deliveries/:id/collect)
+  async collectDelivery(id: string, data: {
+    signatureBase64: string;
+    signedBy: string;
+  }) {
+    return this.request<any>(`/api/deliveries/${id}/collect`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Cancel delivery (v1.2.25 - PATCH /api/deliveries/:id/cancel)
+  async cancelDelivery(id: string) {
+    return this.request<any>(`/api/deliveries/${id}/cancel`, {
+      method: 'PATCH',
     });
   }
 
   // Delete delivery
   async deleteDelivery(id: string) {
-    return this.request<void>(`/deliveries/${id}`, {
+    return this.request<void>(`/api/deliveries/${id}`, {
       method: 'DELETE',
     });
   }
 
-  // Add line item to delivery
-  async addDeliveryLineItem(deliveryId: string, data: {
-    productId: string;
-    quantity: number;
-    unitPrice: number;
-  }) {
-    return this.request<any>(`/deliveries/${deliveryId}/line-items`, {
+  // Export delivery PDF (v1.2.25 - POST /api/deliveries/:id/export-pdf)
+  async exportDeliveryPdf(id: string): Promise<{ pdfBase64: string; filename: string }> {
+    return this.request<{ pdfBase64: string; filename: string }>(`/api/deliveries/${id}/export-pdf`, {
       method: 'POST',
-      body: JSON.stringify(data),
     });
   }
 
-  // Update line item
-  async updateDeliveryLineItem(deliveryId: string, lineItemId: string, data: {
-    quantity?: number;
-    unitPrice?: number;
-  }) {
-    return this.request<any>(`/deliveries/${deliveryId}/line-items/${lineItemId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
-  }
-
-  // Delete line item
-  async deleteDeliveryLineItem(deliveryId: string, lineItemId: string) {
-    return this.request<void>(`/deliveries/${deliveryId}/line-items/${lineItemId}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Capture signature for delivery
-  async captureDeliverySignature(deliveryId: string, data: {
-    signature: string;
-    signedBy: string;
-  }) {
-    return this.request<any>(`/deliveries/${deliveryId}/signature`, {
+  // Email delivery PDF (v1.2.25 - POST /api/deliveries/:id/email-pdf)
+  async emailDeliveryPdf(id: string, recipientEmail: string) {
+    return this.request<{ message: string; sentTo: string }>(`/api/deliveries/${id}/email-pdf`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ recipientEmail }),
     });
   }
 
-  // Import Sales Orders from Sage
-  async importSalesOrders(file: File): Promise<{
+  // Auto-fill from Sage order (v1.2.25 - GET /api/deliveries/sage-order/:orderReference)
+  async getSageOrder(orderReference: string) {
+    return this.request<{
+      orderReference: string;
+      customerName: string;
+      items: Array<{
+        productName: string;
+        productId: string;
+        quantity: number;
+        partNumber: string;
+      }>;
+    }>(`/api/deliveries/sage-order/${encodeURIComponent(orderReference)}`);
+  }
+
+  // Import Suppliers from Sage Excel (v1.2.25 - POST /api/suppliers/import-sage)
+  async importSuppliersFromSage(file: File): Promise<{
     imported: number;
-    errors: Array<{ row: number; error: string }>;
-    deliveryId?: string;
+    skipped: number;
+    errors: Array<{ row?: number; error: string }>;
   }> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.requestFormData('/sage/import/sales-orders', formData);
+    return this.requestFormData('/api/suppliers/import-sage', formData);
+  }
+
+  // ============ DASHBOARD/ANALYTICS APIs ============
+
+  // Get comprehensive dashboard stats (v1.2.25 - GET /api/dashboard/stats)
+  async getDashboardStatsV2() {
+    return this.request<{
+      products: { total: number; lowStock: number; outOfStock: number };
+      deliveries: { total: number; pending: number; collected: number; cancelled: number };
+      jobCards: { total: number; pending: number; inProgress: number; completed: number; cancelled: number };
+      users: { total: number; active: number };
+      recentActivity: Array<{
+        type: string;
+        description: string;
+        timestamp: string;
+        user: { name: string };
+      }>;
+    }>('/api/dashboard/stats');
+  }
+
+  // Get low stock report (v1.2.25 - GET /api/reports/low-stock)
+  async getLowStockReport() {
+    return this.request<Array<{
+      id: string;
+      name: string;
+      sku: string;
+      quantity: number;
+      reorderThreshold: number;
+      supplier: { name: string };
+    }>>('/api/reports/low-stock');
+  }
+
+  // ============ JOB CARD NOTES (v1.2.25) ============
+
+  // Add note to job card (v1.2.25 - POST /api/job-cards/:id/notes)
+  async addJobCardNote(jobCardId: string, content: string) {
+    return this.request<{
+      id: string;
+      content: string;
+      createdBy: { name: string };
+      createdAt: string;
+    }>(`/api/job-cards/${jobCardId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
   }
 }
 

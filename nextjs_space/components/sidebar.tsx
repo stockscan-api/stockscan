@@ -25,12 +25,14 @@ import {
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
+// v1.2.25: Navigation items with role-based access
+// DELIVERY_CLERK only has access to Deliveries (create, collect, PDF export)
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/products', label: 'Products', icon: Package, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/job-cards', label: 'Job Cards', icon: ClipboardList, roles: ['STAFF', 'MANAGER', 'OWNER'] },
-  { href: '/deliveries', label: 'Deliveries', icon: PackageCheck, roles: ['STAFF', 'MANAGER', 'OWNER'] },
+  { href: '/deliveries', label: 'Deliveries', icon: PackageCheck, roles: ['STAFF', 'MANAGER', 'OWNER', 'DELIVERY_CLERK'] },
   { href: '/suppliers', label: 'Suppliers', icon: Truck, roles: ['MANAGER', 'OWNER'] },
   { href: '/import', label: 'Import', icon: Upload, roles: ['MANAGER', 'OWNER'] },
   { href: '/invitations', label: 'Invitations', icon: UserPlus, roles: ['MANAGER', 'OWNER'] },

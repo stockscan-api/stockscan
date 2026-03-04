@@ -19,7 +19,7 @@ interface UserData {
   id: string;
   email: string;
   name: string;
-  role: 'STAFF' | 'MANAGER' | 'OWNER';
+  role: 'STAFF' | 'MANAGER' | 'OWNER' | 'DELIVERY_CLERK';
   isActive: boolean;
   createdAt: string;
 }
@@ -97,6 +97,8 @@ export default function UsersPage() {
         return 'danger';
       case 'MANAGER':
         return 'warning';
+      case 'DELIVERY_CLERK':
+        return 'success'; // Green badge for delivery clerks per v1.2.25
       default:
         return 'info';
     }
@@ -205,7 +207,7 @@ export default function UsersPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="info">STAFF</Badge>
-                <span className="text-sm text-gray-500">View products, adjust stock, transactions</span>
+                <span className="text-sm text-gray-500">View products, adjust stock, deliveries, job cards</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="warning">MANAGER</Badge>
@@ -214,6 +216,10 @@ export default function UsersPage() {
               <div className="flex items-center gap-2">
                 <Badge variant="danger">OWNER</Badge>
                 <span className="text-sm text-gray-500">Full access including user management</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="success">DELIVERY_CLERK</Badge>
+                <span className="text-sm text-gray-500">Deliveries only (create, collect, PDF)</span>
               </div>
             </div>
           </CardContent>
@@ -252,6 +258,7 @@ export default function UsersPage() {
                 { value: 'STAFF', label: 'Staff - Basic access' },
                 { value: 'MANAGER', label: 'Manager - Extended access' },
                 { value: 'OWNER', label: 'Owner - Full access' },
+                { value: 'DELIVERY_CLERK', label: 'Delivery Clerk - Deliveries only' },
               ]}
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}

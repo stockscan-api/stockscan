@@ -1,6 +1,7 @@
 // API Types for Inventory Management System
 
-export type UserRole = 'STAFF' | 'MANAGER' | 'OWNER' | 'SUPER_ADMIN';
+// v1.2.25: Added DELIVERY_CLERK role for counter staff who handle customer collections
+export type UserRole = 'STAFF' | 'MANAGER' | 'OWNER' | 'DELIVERY_CLERK' | 'SUPER_ADMIN';
 
 export interface Company {
   id: string;
