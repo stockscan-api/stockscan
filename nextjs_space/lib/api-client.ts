@@ -690,6 +690,7 @@ class ApiClient {
   }
 
   // Parse Sage Sales Order Excel file (POST /api/deliveries/parse-sage-excel)
+  // This calls the LOCAL Next.js API route, not the backend - so no proxy needed
   async parseSageOrderExcel(formData: FormData): Promise<{
     items: Array<{
       productCode: string;
@@ -701,7 +702,18 @@ class ApiClient {
     }>;
     orderReference?: string;
   }> {
-    return this.requestFormData('/api/deliveries/parse-sage-excel', formData);
+    // Call local Next.js API route directly (not through proxy)
+    const response = await fetch('/api/deliveries/parse-sage-excel', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to parse Excel file' }));
+      throw new Error(error?.error || error?.message || 'Failed to parse Excel file');
+    }
+
+    return response.json();
   }
 
   // Import Suppliers from Sage Excel (v1.2.25 - POST /api/suppliers/import-sage)
