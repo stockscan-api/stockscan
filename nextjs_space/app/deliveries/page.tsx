@@ -200,10 +200,9 @@ export default function DeliveriesPage() {
       // v1.2.25 Map parsed items to the backend's expected format
       // Backend expects: productId, productName, quantity, and optional notes
       const deliveryItems = sageItems.length > 0 ? sageItems.map(item => ({
-        productId: item.productCode || item.partNumber || item.productId || '',
-        productName: item.description || item.productName || '',
-        quantity: item.quantity,
-        notes: '',
+        productId: String(item.productCode || item.partNumber || item.productId || ''),
+        productName: String(item.description || item.productName || 'Unknown Product'),
+        quantity: Math.round(Number(item.quantity) || 1),
       })) : undefined;
 
       await apiClient.createDelivery({
