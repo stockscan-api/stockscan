@@ -27,6 +27,9 @@ import {
   Package,
   FileText,
   RefreshCw,
+  Upload,
+  FileSpreadsheet,
+  X,
 } from 'lucide-react';
 
 interface DeliveryItem {
@@ -84,6 +87,11 @@ export default function DeliveriesPage() {
   // Sage auto-fill
   const [isLoadingSage, setIsLoadingSage] = useState(false);
   const [sageItems, setSageItems] = useState<any[]>([]);
+  
+  // Excel file import
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isParsingFile, setIsParsingFile] = useState(false);
 
   useEffect(() => {
     fetchDeliveries();
@@ -115,26 +123,69 @@ export default function DeliveriesPage() {
     fetchDeliveries();
   };
 
-  // Auto-fill from Sage order reference
-  const handleSageAutoFill = async () => {
-    if (!formData.sageOrderReference.trim()) {
-      toast.error('Please enter a Sage order reference');
+  // Handle Excel file selection for Sage Sales Order import
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    if (!validTypes.includes(file.type) && !file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      toast.error('Please select a valid Excel file (.xlsx or .xls)');
       return;
     }
 
-    setIsLoadingSage(true);
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setSelectedFile(file);
+    parseExcelFile(file);
+  };
+
+  // Parse Sage Sales Order Excel file
+  const parseExcelFile = async (file: File) => {
+    setIsParsingFile(true);
     try {
-      const sageOrder = await apiClient.getSageOrder(formData.sageOrderReference.trim());
-      setFormData(prev => ({
-        ...prev,
-        customerName: sageOrder.customerName || prev.customerName,
-      }));
-      setSageItems(sageOrder.items || []);
-      toast.success('Sage order data loaded');
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Send to backend for parsing
+      const response = await apiClient.parseSageOrderExcel(formData);
+      
+      if (response?.items && response.items.length > 0) {
+        setSageItems(response.items);
+        // Extract order reference from filename if present (e.g., "SO-12345.xlsx")
+        const fileNameMatch = file.name.match(/([A-Z]{2,3}[-_]?\d+)/i);
+        if (fileNameMatch) {
+          setFormData(prev => ({
+            ...prev,
+            sageOrderReference: fileNameMatch[1].toUpperCase(),
+          }));
+        }
+        toast.success(`${response.items.length} items loaded from Excel file`);
+      } else {
+        toast.error('No valid items found in Excel file');
+      }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to fetch Sage order');
+      console.error('Parse error:', error);
+      toast.error(error.message || 'Failed to parse Excel file');
     } finally {
-      setIsLoadingSage(false);
+      setIsParsingFile(false);
+    }
+  };
+
+  // Clear selected file
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    setSageItems([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -146,17 +197,22 @@ export default function DeliveriesPage() {
 
     setIsCreating(true);
     try {
+      // Map parsed items to the delivery item format
+      const deliveryItems = sageItems.length > 0 ? sageItems.map(item => ({
+        productCode: item.productCode || item.partNumber || item.productId,
+        productName: item.description || item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        notes: item.notes,
+      })) : undefined;
+
       await apiClient.createDelivery({
         customerName: formData.customerName,
         customerEmail: formData.customerEmail || undefined,
         customerPhone: formData.customerPhone || undefined,
         sageOrderReference: formData.sageOrderReference || undefined,
         deliveryDate: formData.deliveryDate || undefined,
-        items: sageItems.length > 0 ? sageItems.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          notes: item.notes,
-        })) : undefined,
+        items: deliveryItems,
       });
       toast.success('Delivery created successfully');
       setShowCreateModal(false);
@@ -178,6 +234,10 @@ export default function DeliveriesPage() {
       deliveryDate: '',
     });
     setSageItems([]);
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   // DELIVERY_CLERK can only access deliveries
@@ -366,34 +426,81 @@ export default function DeliveriesPage() {
           title="Create New Delivery"
         >
           <div className="space-y-4">
-            {/* Sage Order Auto-fill */}
+            {/* Sage Sales Order Excel Import */}
             <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
               <label className="block text-sm font-medium text-purple-800 mb-2">
-                Auto-fill from Sage Order (Optional)
+                <FileSpreadsheet className="h-4 w-4 inline mr-1" />
+                Import from Sage Sales Order (Optional)
               </label>
-              <div className="flex gap-2">
-                <Input
-                  value={formData.sageOrderReference}
-                  onChange={(e) => setFormData({ ...formData, sageOrderReference: e.target.value })}
-                  placeholder="e.g., SO-12345"
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleSageAutoFill}
-                  disabled={isLoadingSage || !formData.sageOrderReference.trim()}
-                  className="border-purple-300 text-purple-700 hover:bg-purple-100"
+              <p className="text-xs text-purple-600 mb-3">
+                Upload an Excel file exported from Sage 50 to auto-fill delivery items
+              </p>
+              
+              {!selectedFile ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-purple-300 rounded-lg p-6 text-center cursor-pointer hover:bg-purple-100 transition-colors"
                 >
-                  {isLoadingSage ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  <span className="ml-1">Load</span>
-                </Button>
-              </div>
-              {sageItems.length > 0 && (
-                <p className="text-xs text-purple-600 mt-2">
-                  ✓ {sageItems.length} items loaded from Sage order
-                </p>
+                  <Upload className="h-8 w-8 mx-auto text-purple-400 mb-2" />
+                  <p className="text-sm text-purple-700 font-medium">Click to upload Excel file</p>
+                  <p className="text-xs text-purple-500 mt-1">.xlsx or .xls (max 5MB)</p>
+                </div>
+              ) : (
+                <div className="bg-white border border-purple-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="h-5 w-5 text-purple-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{selectedFile.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {(selectedFile.size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearSelectedFile}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {isParsingFile && (
+                    <div className="flex items-center gap-2 mt-2 text-purple-600 text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Parsing Excel file...
+                    </div>
+                  )}
+                  {sageItems.length > 0 && !isParsingFile && (
+                    <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      {sageItems.length} items loaded successfully
+                    </p>
+                  )}
+                </div>
               )}
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
+            
+            {/* Sage Order Reference (manual or extracted from filename) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sage Order Reference
+              </label>
+              <Input
+                value={formData.sageOrderReference}
+                onChange={(e) => setFormData({ ...formData, sageOrderReference: e.target.value })}
+                placeholder="e.g., SO-12345"
+              />
             </div>
 
             <div>
@@ -446,15 +553,23 @@ export default function DeliveriesPage() {
             {sageItems.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Items from Sage Order
+                  Items from Sage Sales Order ({sageItems.length} items)
                 </label>
-                <div className="bg-gray-50 rounded-lg p-3 space-y-2 max-h-40 overflow-auto">
-                  {sageItems.map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-sm">
-                      <span>{item.productName || item.partNumber}</span>
-                      <span className="font-medium">Qty: {item.quantity}</span>
-                    </div>
-                  ))}
+                <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="bg-gray-100 px-3 py-2 border-b border-gray-200 grid grid-cols-12 gap-2 text-xs font-semibold text-gray-600">
+                    <div className="col-span-3">Code</div>
+                    <div className="col-span-7">Description</div>
+                    <div className="col-span-2 text-right">Qty</div>
+                  </div>
+                  <div className="max-h-48 overflow-auto">
+                    {sageItems.map((item, idx) => (
+                      <div key={idx} className="px-3 py-2 grid grid-cols-12 gap-2 text-sm border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                        <div className="col-span-3 font-mono text-xs text-purple-700">{item.productCode || item.partNumber || '-'}</div>
+                        <div className="col-span-7 text-gray-800 truncate">{item.description || item.productName || '-'}</div>
+                        <div className="col-span-2 text-right font-semibold">{item.quantity}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

@@ -607,8 +607,11 @@ class ApiClient {
     sageOrderReference?: string;
     deliveryDate?: string;
     items?: Array<{
-      productId: string;
+      productId?: string;
+      productCode?: string;
+      productName?: string;
       quantity: number;
+      unitPrice?: number;
       notes?: string;
     }>;
   }) {
@@ -684,6 +687,21 @@ class ApiClient {
         partNumber: string;
       }>;
     }>(`/api/deliveries/sage-order/${encodeURIComponent(orderReference)}`);
+  }
+
+  // Parse Sage Sales Order Excel file (POST /api/deliveries/parse-sage-excel)
+  async parseSageOrderExcel(formData: FormData): Promise<{
+    items: Array<{
+      productCode: string;
+      description: string;
+      quantity: number;
+      unitPrice?: number;
+      netPrice?: number;
+      vatAmount?: number;
+    }>;
+    orderReference?: string;
+  }> {
+    return this.requestFormData('/api/deliveries/parse-sage-excel', formData);
   }
 
   // Import Suppliers from Sage Excel (v1.2.25 - POST /api/suppliers/import-sage)
