@@ -600,7 +600,7 @@ class ApiClient {
   }
 
   // Create delivery (v1.2.25 spec)
-  // Backend accepts: productId, quantity, notes (no productCode, productName, unitPrice)
+  // Backend accepts: productId, productName, quantity, notes
   async createDelivery(data: {
     customerName: string;
     customerEmail?: string;
@@ -609,6 +609,7 @@ class ApiClient {
     deliveryDate?: string;
     items?: Array<{
       productId: string;
+      productName: string;
       quantity: number;
       notes?: string;
     }>;
