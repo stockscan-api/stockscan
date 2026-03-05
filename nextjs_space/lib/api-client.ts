@@ -619,6 +619,25 @@ class ApiClient {
     });
   }
 
+  // Create delivery with Sage items (for Excel imports - uses productCode instead of productId)
+  async createDeliveryWithSageItems(data: {
+    customerName: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    sageOrderReference?: string;
+    deliveryDate?: string;
+    items?: Array<{
+      productCode: string;
+      productName: string;
+      quantity: number;
+    }>;
+  }) {
+    return this.request<any>('/api/deliveries/sage', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Update delivery
   async updateDelivery(id: string, data: {
     customerName?: string;
