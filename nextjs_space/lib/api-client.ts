@@ -600,39 +600,23 @@ class ApiClient {
   }
 
   // Create delivery (v1.2.25 spec)
-  // Backend accepts: productId, productName, quantity
+  // Backend accepts: productId (null for Sage imports), productName, sku, quantity, notes
   async createDelivery(data: {
     customerName: string;
     customerEmail?: string;
     customerPhone?: string;
     sageOrderReference?: string;
     deliveryDate?: string;
+    notes?: string;
     items?: Array<{
-      productId: string;
+      productId: string | null;  // null for products not in database (Sage imports)
       productName: string;
+      sku?: string;  // Product code from Sage
       quantity: number;
+      notes?: string;
     }>;
   }) {
     return this.request<any>('/api/deliveries', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  // Create delivery with Sage items (for Excel imports - uses productCode instead of productId)
-  async createDeliveryWithSageItems(data: {
-    customerName: string;
-    customerEmail?: string;
-    customerPhone?: string;
-    sageOrderReference?: string;
-    deliveryDate?: string;
-    items?: Array<{
-      productCode: string;
-      productName: string;
-      quantity: number;
-    }>;
-  }) {
-    return this.request<any>('/api/deliveries/sage', {
       method: 'POST',
       body: JSON.stringify(data),
     });

@@ -198,42 +198,23 @@ export default function DeliveriesPage() {
     setIsCreating(true);
     try {
       // v1.2.25 Map parsed items to the backend's expected format
-      // For Sage imports, items contain productCode/productName/quantity (no productId lookup needed)
+      // For Sage imports: productId = null, sku = product code, productName = description
       const deliveryItems = sageItems.length > 0 ? sageItems.map(item => ({
-        productCode: String(item.productCode || item.partNumber || ''),
+        productId: null,  // null for products not in database (Sage imports)
         productName: String(item.description || item.productName || 'Unknown Product'),
+        sku: String(item.productCode || item.partNumber || ''),
         quantity: Math.round(Number(item.quantity) || 1),
+        notes: 'Imported from Sage Sales Order',
       })) : undefined;
 
-      try {
-        // Try Sage-specific endpoint first (supports productCode instead of productId)
-        await apiClient.createDeliveryWithSageItems({
-          customerName: formData.customerName,
-          customerEmail: formData.customerEmail || undefined,
-          customerPhone: formData.customerPhone || undefined,
-          sageOrderReference: formData.sageOrderReference || undefined,
-          deliveryDate: formData.deliveryDate || undefined,
-          items: deliveryItems,
-        });
-      } catch (sageError: any) {
-        // Fallback: create delivery without items if Sage endpoint doesn't exist
-        console.log('Sage endpoint failed, trying standard endpoint without items:', sageError.message);
-        await apiClient.createDelivery({
-          customerName: formData.customerName,
-          customerEmail: formData.customerEmail || undefined,
-          customerPhone: formData.customerPhone || undefined,
-          sageOrderReference: formData.sageOrderReference || undefined,
-          deliveryDate: formData.deliveryDate || undefined,
-          // Don't include items - let them be added separately or via notes
-        });
-        if (deliveryItems && deliveryItems.length > 0) {
-          toast.success(`Delivery created. Note: ${deliveryItems.length} items from Sage order saved in reference.`);
-          setShowCreateModal(false);
-          resetForm();
-          fetchDeliveries();
-          return;
-        }
-      }
+      await apiClient.createDelivery({
+        customerName: formData.customerName,
+        customerEmail: formData.customerEmail || undefined,
+        customerPhone: formData.customerPhone || undefined,
+        sageOrderReference: formData.sageOrderReference || undefined,
+        deliveryDate: formData.deliveryDate || undefined,
+        items: deliveryItems,
+      });
       toast.success('Delivery created successfully');
       setShowCreateModal(false);
       resetForm();
