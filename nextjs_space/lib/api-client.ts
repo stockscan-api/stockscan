@@ -760,17 +760,104 @@ class ApiClient {
 
   // ============ JOB CARD NOTES (v1.2.25) ============
 
-  // Add note to job card (v1.2.25 - POST /api/job-cards/:id/notes)
+  // Add note to job card
   async addJobCardNote(jobCardId: string, content: string) {
-    return this.request<{
-      id: string;
-      content: string;
-      createdBy: { name: string };
-      createdAt: string;
-    }>(`/api/job-cards/${jobCardId}/notes`, {
+    return this.request<any>(`/job-cards/${jobCardId}/notes`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
+  }
+
+  // Update job card notes (PUT /job-cards/:id/notes)
+  async updateJobCardNotes(jobCardId: string, notes: string) {
+    return this.request<any>(`/job-cards/${jobCardId}/notes`, {
+      method: 'PUT',
+      body: JSON.stringify({ notes }),
+    });
+  }
+
+  // ============ JOB CARD ACTIVITY LOG ============
+
+  // Get job card activity log
+  async getJobCardActivity(jobCardId: string) {
+    return this.request<any>(`/job-cards/${jobCardId}/activity`);
+  }
+
+  // ============ JOB CARD INVOICE & EXPORT ============
+
+  // Generate job card invoice
+  async getJobCardInvoice(jobCardId: string) {
+    return this.request<any>(`/job-cards/${jobCardId}/invoice`);
+  }
+
+  // Export job card to Sage CSV
+  async exportJobCardSageCSV(jobCardId: string) {
+    return this.request<any>(`/job-cards/${jobCardId}/export-sage`);
+  }
+
+  // ============ REPORTS ============
+
+  async getReportSales(params: { startDate: string; endDate: string; format?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return this.request<any>(`/reports/sales?${query}`);
+  }
+
+  async getReportStock(params: { startDate: string; endDate: string; format?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return this.request<any>(`/reports/stock?${query}`);
+  }
+
+  async getReportJobCards(params: { startDate: string; endDate: string; format?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return this.request<any>(`/reports/job-cards?${query}`);
+  }
+
+  async getReportProfitLoss(params: { startDate: string; endDate: string; format?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return this.request<any>(`/reports/profit-loss?${query}`);
+  }
+
+  // ============ POS (Point of Sale) ============
+
+  async getPosSales(params?: { page?: number; limit?: number }) {
+    const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return this.request<any>(`/pos/sales${query}`);
+  }
+
+  async getPosSale(saleId: string) {
+    return this.request<any>(`/pos/sales/${saleId}`);
+  }
+
+  async createPosSale(data: { items: Array<{ productId: string; quantity: number; price: number }>; paymentMethod: string; customerName?: string; notes?: string }) {
+    return this.request<any>('/pos/sales', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async refundPosSale(saleId: string, data?: { reason?: string }) {
+    return this.request<any>(`/pos/sales/${saleId}/refund`, { method: 'POST', body: JSON.stringify(data || {}) });
+  }
+
+  async getPosReceipt(saleId: string) {
+    return this.request<any>(`/pos/receipt/${saleId}`);
+  }
+
+  // ============ FEATURE FLAGS ============
+
+  async getFeatureFlags() {
+    return this.request<any>('/feature-flags');
+  }
+
+  async updateFeatureFlags(flags: Record<string, boolean>) {
+    return this.request<any>('/feature-flags', { method: 'PUT', body: JSON.stringify(flags) });
+  }
+
+  // ============ COMPANY BRANDING ============
+
+  async getCompanyBranding() {
+    return this.request<any>('/company');
+  }
+
+  async updateBranding(data: { companyName?: string; logo?: string; primaryColor?: string; secondaryColor?: string }) {
+    return this.request<any>('/company/branding', { method: 'PUT', body: JSON.stringify(data) });
   }
 }
 

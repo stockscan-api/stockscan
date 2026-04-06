@@ -22,7 +22,14 @@ import {
   Trash2,
   X,
   Save,
-  AlertTriangle
+  AlertTriangle,
+  FileText,
+  Download,
+  Activity,
+  MessageSquare,
+  Send,
+  PlayCircle,
+  Lock
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -38,7 +45,13 @@ interface StockAllocation {
   id: string;
   stockItemId: string;
   stockItem?: StockItem;
+  product?: { id: string; name: string; sku: string; barcode?: string };
   quantity: number;
+  quantityAllocated?: number;
+  quantityReturned?: number;
+  quantityOnJob?: number;
+  unitCost?: string;
+  totalCost?: string;
   allocatedBy?: string;
   createdAt: string;
 }
@@ -49,26 +62,40 @@ interface LabourEntry {
   staffMember?: { id: string; name: string; email: string };
   hoursWorked: number;
   hourlyRate: number;
-  labourCost: number; // Auto-calculated: hoursWorked * hourlyRate
+  labourCost: number;
   dateWorked: string;
   description?: string;
   createdAt: string;
 }
 
+interface ActivityEntry {
+  id: string;
+  action: string;
+  details: string;
+  performedByUser?: { id: string; name: string };
+  performedByUserId?: string;
+  performedAt: string;
+  createdAt: string;
+}
+
 interface JobCard {
   id: string;
-  jobReference?: string; // Custom or auto-generated
+  jobReference?: string;
   title: string;
   jobName?: string;
+  customer?: string;
   description?: string;
   customerName?: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'OPEN';
+  contactNumber?: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'OPEN' | 'CLOSED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   assignedToUserId?: string;
   assignedTo?: { id: string; name: string; email: string };
   companyId: string;
   completedAt?: string;
   actualCompletionDate?: string;
+  startDate?: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
   stockAllocations?: StockAllocation[];
@@ -89,16 +116,28 @@ interface User {
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   OPEN: { label: 'Open', color: 'bg-blue-100 text-blue-700', icon: Clock },
   PENDING: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
-  IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-100 text-blue-700', icon: Loader2 },
+  IN_PROGRESS: { label: 'In Progress', color: 'bg-indigo-100 text-indigo-700', icon: Loader2 },
   COMPLETED: { label: 'Completed', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
-  CANCELLED: { label: 'Cancelled', color: 'bg-gray-100 text-gray-700', icon: XCircle },
+  CLOSED: { label: 'Closed', color: 'bg-gray-100 text-gray-700', icon: Lock },
+  CANCELLED: { label: 'Cancelled', color: 'bg-red-100 text-red-700', icon: XCircle },
 };
 
-const priorityConfig = {
+const priorityConfig: Record<string, { label: string; color: string }> = {
   LOW: { label: 'Low', color: 'bg-slate-100 text-slate-700' },
   MEDIUM: { label: 'Medium', color: 'bg-blue-100 text-blue-700' },
   HIGH: { label: 'High', color: 'bg-orange-100 text-orange-700' },
   URGENT: { label: 'Urgent', color: 'bg-red-100 text-red-700' },
+};
+
+// Status workflow: OPEN → IN_PROGRESS → COMPLETED → CLOSED
+const getNextStatusAction = (status: string) => {
+  switch (status) {
+    case 'OPEN': return { nextStatus: 'IN_PROGRESS', label: 'Start Job', color: 'bg-blue-600 hover:bg-blue-700', icon: PlayCircle };
+    case 'PENDING': return { nextStatus: 'IN_PROGRESS', label: 'Start Job', color: 'bg-blue-600 hover:bg-blue-700', icon: PlayCircle };
+    case 'IN_PROGRESS': return { nextStatus: 'COMPLETED', label: 'Mark Completed', color: 'bg-green-600 hover:bg-green-700', icon: CheckCircle2 };
+    case 'COMPLETED': return { nextStatus: 'CLOSED', label: 'Close Job', color: 'bg-gray-600 hover:bg-gray-700', icon: Lock };
+    default: return null;
+  }
 };
 
 export default function JobCardDetailPage() {
@@ -136,8 +175,21 @@ export default function JobCardDetailPage() {
     description: ''
   });
 
-  // Active tab (materials or labour)
-  const [activeTab, setActiveTab] = useState<'materials' | 'labour'>('materials');
+  // Active tab
+  const [activeTab, setActiveTab] = useState<'materials' | 'labour' | 'activity' | 'notes'>('materials');
+
+  // Activity log
+  const [activityLog, setActivityLog] = useState<ActivityEntry[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(false);
+
+  // Notes
+  const [notesText, setNotesText] = useState('');
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  // Invoice & Export
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  const [exportingSage, setExportingSage] = useState(false);
 
   // Edit form
   const [editForm, setEditForm] = useState({
@@ -155,10 +207,11 @@ export default function JobCardDetailPage() {
       setLoading(true);
       const response = await apiClient.getJobCard(jobCardId);
       setJobCard(response);
+      setNotesText(response.notes || '');
       setEditForm({
         title: response.title || '',
         description: response.description || '',
-        customerName: response.customerName || '',
+        customerName: response.customerName || response.customer || '',
         priority: response.priority || 'MEDIUM',
         status: response.status || 'PENDING',
         assignedToUserId: response.assignedToUserId || ''
@@ -171,6 +224,20 @@ export default function JobCardDetailPage() {
       setLoading(false);
     }
   }, [jobCardId, router]);
+
+  const fetchActivity = useCallback(async () => {
+    if (!jobCardId) return;
+    try {
+      setLoadingActivity(true);
+      const response = await apiClient.getJobCardActivity(jobCardId);
+      const entries = Array.isArray(response) ? response : (response?.data || response?.activities || []);
+      setActivityLog(entries);
+    } catch (error: any) {
+      console.error('Error fetching activity:', error);
+    } finally {
+      setLoadingActivity(false);
+    }
+  }, [jobCardId]);
 
   const fetchStockItems = useCallback(async () => {
     try {
@@ -198,6 +265,12 @@ export default function JobCardDetailPage() {
     fetchStockItems();
     fetchUsers();
   }, [fetchJobCard, fetchStockItems, fetchUsers]);
+
+  useEffect(() => {
+    if (activeTab === 'activity') {
+      fetchActivity();
+    }
+  }, [activeTab, fetchActivity]);
 
   const handleAllocateStock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,19 +351,136 @@ export default function JobCardDetailPage() {
     }
   };
 
-  const handleCompleteJob = async () => {
+  const handleChangeStatus = async (nextStatus: string) => {
     try {
       setUpdating(true);
-      await apiClient.updateJobCardStatus(jobCardId, { 
-        status: 'COMPLETED',
-        actualCompletionDate: new Date().toISOString()
-      });
-      toast.success('Job marked as completed');
+      const payload: any = { status: nextStatus };
+      if (nextStatus === 'COMPLETED') {
+        payload.actualCompletionDate = new Date().toISOString();
+      }
+      await apiClient.updateJobCardStatus(jobCardId, payload);
+      const labels: Record<string, string> = {
+        IN_PROGRESS: 'Job started',
+        COMPLETED: 'Job marked as completed',
+        CLOSED: 'Job closed',
+      };
+      toast.success(labels[nextStatus] || `Status changed to ${nextStatus}`);
       fetchJobCard();
+      if (activeTab === 'activity') fetchActivity();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to complete job');
+      toast.error(error.message || 'Failed to change status');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  // ========== Notes Functions ==========
+
+  const handleSaveNotes = async () => {
+    try {
+      setSavingNotes(true);
+      await apiClient.updateJobCardNotes(jobCardId, notesText);
+      toast.success('Notes saved');
+      setEditingNotes(false);
+      fetchJobCard();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save notes');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  // ========== Invoice & Export Functions ==========
+
+  const handleGenerateInvoice = async () => {
+    try {
+      setGeneratingInvoice(true);
+      const invoice = await apiClient.getJobCardInvoice(jobCardId);
+      // If invoice returns content for display/download
+      if (invoice?.content || invoice?.html) {
+        const content = invoice.content || invoice.html;
+        const blob = new Blob([content], { type: 'text/html' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${jobCard?.jobReference || 'invoice'}_invoice.html`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else if (invoice?.url) {
+        window.open(invoice.url, '_blank');
+      } else {
+        // Display invoice data in a new window
+        const invoiceWindow = window.open('', '_blank');
+        if (invoiceWindow) {
+          const ref = invoice?.jobReference || jobCard?.jobReference || '';
+          const cust = invoice?.customer || jobCard?.customerName || jobCard?.customer || '';
+          const items = invoice?.items || [];
+          const labour = invoice?.labour || [];
+          invoiceWindow.document.write(`
+            <html><head><title>Invoice - ${ref}</title>
+            <style>body{font-family:Arial,sans-serif;max-width:800px;margin:auto;padding:20px}
+            table{width:100%;border-collapse:collapse;margin:15px 0}
+            th,td{border:1px solid #ddd;padding:8px;text-align:left}
+            th{background:#f5f5f5}
+            .total{font-weight:bold;font-size:1.2em}
+            @media print{button{display:none}}</style></head><body>
+            <h1>Invoice: ${ref}</h1>
+            <p><strong>Customer:</strong> ${cust}</p>
+            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+            <h3>Materials</h3>
+            <table><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+            ${items.map((i: any) => `<tr><td>${i.description || i.name || ''}</td><td>${i.quantity || ''}</td><td>£${parseFloat(i.unitPrice || 0).toFixed(2)}</td><td>£${parseFloat(i.total || i.lineTotal || 0).toFixed(2)}</td></tr>`).join('')}
+            </table>
+            <h3>Labour</h3>
+            <table><tr><th>Description</th><th>Hours</th><th>Rate</th><th>Total</th></tr>
+            ${labour.map((l: any) => `<tr><td>${l.description || ''}</td><td>${l.hours || l.hoursWorked || ''}</td><td>£${parseFloat(l.rate || l.hourlyRate || 0).toFixed(2)}</td><td>£${parseFloat(l.total || l.labourCost || 0).toFixed(2)}</td></tr>`).join('')}
+            </table>
+            <hr/>
+            <p>Subtotal: £${parseFloat(invoice?.subtotal || invoice?.totalCost || '0').toFixed(2)}</p>
+            ${invoice?.tax ? `<p>VAT: £${parseFloat(invoice.tax).toFixed(2)}</p>` : ''}
+            <p class="total">Total: £${parseFloat(invoice?.total || invoice?.totalCost || '0').toFixed(2)}</p>
+            <br/><button onclick="window.print()">Print Invoice</button>
+            </body></html>
+          `);
+        }
+      }
+      toast.success('Invoice generated');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to generate invoice');
+    } finally {
+      setGeneratingInvoice(false);
+    }
+  };
+
+  const handleExportSageCSV = async () => {
+    try {
+      setExportingSage(true);
+      const result = await apiClient.exportJobCardSageCSV(jobCardId);
+      const csvContent = result?.content || result?.csv || '';
+      const filename = result?.filename || `${jobCard?.jobReference || 'job'}_sage_export.csv`;
+      
+      if (csvContent) {
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        toast.success('Sage CSV exported');
+      } else if (result?.url) {
+        const a = document.createElement('a');
+        a.href = result.url;
+        a.download = filename;
+        a.click();
+        toast.success('Sage CSV exported');
+      } else {
+        toast.error('No export data returned');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to export Sage CSV');
+    } finally {
+      setExportingSage(false);
     }
   };
 
@@ -459,18 +649,51 @@ export default function JobCardDetailPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900">{jobCard.jobName || jobCard.title}</h1>
           </div>
-          <div className="flex items-center gap-2">
-            {jobCard.status !== 'COMPLETED' && jobCard.status !== 'CANCELLED' && (
-              <button
-                onClick={handleCompleteJob}
-                disabled={updating}
-                className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Complete Job
-              </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {(() => {
+              const nextAction = getNextStatusAction(jobCard.status);
+              if (nextAction) {
+                const ActionIcon = nextAction.nextStatus === 'IN_PROGRESS' ? PlayCircle 
+                  : nextAction.nextStatus === 'COMPLETED' ? CheckCircle2 
+                  : Lock;
+                return (
+                  <button
+                    onClick={() => handleChangeStatus(nextAction.nextStatus)}
+                    disabled={updating}
+                    className={`inline-flex items-center gap-2 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ${
+                      nextAction.nextStatus === 'IN_PROGRESS' ? 'bg-blue-600 hover:bg-blue-700'
+                      : nextAction.nextStatus === 'COMPLETED' ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-gray-600 hover:bg-gray-700'
+                    }`}
+                  >
+                    <ActionIcon className="h-4 w-4" />
+                    {nextAction.label}
+                  </button>
+                );
+              }
+              return null;
+            })()}
+            {(jobCard.status === 'COMPLETED' || jobCard.status === 'CLOSED') && (
+              <>
+                <button
+                  onClick={handleGenerateInvoice}
+                  disabled={generatingInvoice}
+                  className="inline-flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                >
+                  {generatingInvoice ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  Invoice
+                </button>
+                <button
+                  onClick={handleExportSageCSV}
+                  disabled={exportingSage}
+                  className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                >
+                  {exportingSage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  Sage CSV
+                </button>
+              </>
             )}
-            {canManage && (
+            {canManage && jobCard.status !== 'CLOSED' && (
               <>
                 <button
                   onClick={() => setShowEditModal(true)}
@@ -527,32 +750,32 @@ export default function JobCardDetailPage() {
               </div>
             </div>
 
-            {/* Materials & Labour Tabs */}
+            {/* Materials, Labour, Activity & Notes Tabs */}
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               {/* Tab Headers */}
               <div className="border-b border-gray-200 flex">
-                <button
-                  onClick={() => setActiveTab('materials')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
-                    activeTab === 'materials' 
-                      ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
-                >
-                  <Package className="h-4 w-4" />
-                  Materials ({allocations.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab('labour')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 ${
-                    activeTab === 'labour' 
-                      ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
-                >
-                  <Clock className="h-4 w-4" />
-                  Labour ({labourEntries.length})
-                </button>
+                {([
+                  { key: 'materials' as const, icon: Package, label: `Materials (${allocations.length})` },
+                  { key: 'labour' as const, icon: Clock, label: `Labour (${labourEntries.length})` },
+                  { key: 'activity' as const, icon: Activity, label: 'Activity' },
+                  { key: 'notes' as const, icon: MessageSquare, label: 'Notes' },
+                ]).map(tab => {
+                  const TabIcon = tab.icon;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`flex-1 px-3 py-3 text-sm font-medium flex items-center justify-center gap-1.5 ${
+                        activeTab === tab.key 
+                          ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' 
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }`}
+                    >
+                      <TabIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Tab Content */}
@@ -561,7 +784,7 @@ export default function JobCardDetailPage() {
                   <>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-semibold text-gray-900">Allocated Stock</h2>
-                      {jobCard.status !== 'COMPLETED' && jobCard.status !== 'CANCELLED' && (
+                      {jobCard.status !== 'COMPLETED' && jobCard.status !== 'CANCELLED' && jobCard.status !== 'CLOSED' && (
                         <div className="flex gap-2">
                           <button
                             onClick={() => setShowAllocateModal(true)}
@@ -611,7 +834,7 @@ export default function JobCardDetailPage() {
                   <>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-semibold text-gray-900">Labour Entries</h2>
-                      {jobCard.status !== 'COMPLETED' && jobCard.status !== 'CANCELLED' && (
+                      {jobCard.status !== 'COMPLETED' && jobCard.status !== 'CANCELLED' && jobCard.status !== 'CLOSED' && (
                         <button
                           onClick={() => {
                             setEditingLabour(null);
@@ -648,7 +871,7 @@ export default function JobCardDetailPage() {
                               <p className="font-semibold text-green-600">£{entry.labourCost.toFixed(2)}</p>
                               <p className="text-sm text-gray-500">{new Date(entry.dateWorked).toLocaleDateString()}</p>
                             </div>
-                            {jobCard.status !== 'COMPLETED' && jobCard.status !== 'CANCELLED' && (
+                            {jobCard.status !== 'COMPLETED' && jobCard.status !== 'CANCELLED' && jobCard.status !== 'CLOSED' && (
                               <div className="flex items-center gap-1 ml-4">
                                 <button
                                   onClick={() => openEditLabour(entry)}
@@ -680,6 +903,104 @@ export default function JobCardDetailPage() {
                       </div>
                     )}
                   </>
+                )}
+
+                {activeTab === 'activity' && (
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Activity Log</h2>
+                    {loadingActivity ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                      </div>
+                    ) : activityLog.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Activity className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                        <p>No activity recorded yet</p>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
+                        <div className="space-y-4">
+                          {activityLog.map((entry, idx) => (
+                            <div key={idx} className="relative pl-10">
+                              <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow" />
+                              <div className="bg-gray-50 rounded-lg p-3">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <p className="font-medium text-gray-900 text-sm">{entry.action}</p>
+                                    {entry.details && (
+                                      <p className="text-sm text-gray-600 mt-0.5">{entry.details}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                                  {entry.performedByUser && (
+                                    <span>by {typeof entry.performedByUser === 'object' ? (entry.performedByUser as any).name : entry.performedByUser}</span>
+                                  )}
+                                  <span>{new Date(entry.performedAt).toLocaleString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'notes' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg font-semibold text-gray-900">Job Notes</h2>
+                      {!editingNotes && jobCard.status !== 'CLOSED' && (
+                        <button
+                          onClick={() => setEditingNotes(true)}
+                          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                    {editingNotes ? (
+                      <div className="space-y-3">
+                        <textarea
+                          value={notesText}
+                          onChange={(e) => setNotesText(e.target.value)}
+                          rows={8}
+                          placeholder="Add notes about this job..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingNotes(false);
+                              setNotesText(jobCard.notes || '');
+                            }}
+                            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveNotes}
+                            disabled={savingNotes}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {savingNotes ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                            Save Notes
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-lg p-4 min-h-[120px]">
+                        {notesText ? (
+                          <p className="text-gray-700 whitespace-pre-wrap text-sm">{notesText}</p>
+                        ) : (
+                          <p className="text-gray-400 italic text-sm">No notes added yet. Click Edit to add notes.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -918,9 +1239,11 @@ export default function JobCardDetailPage() {
                       onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
+                      <option value="OPEN">Open</option>
                       <option value="PENDING">Pending</option>
                       <option value="IN_PROGRESS">In Progress</option>
                       <option value="COMPLETED">Completed</option>
+                      <option value="CLOSED">Closed</option>
                       <option value="CANCELLED">Cancelled</option>
                     </select>
                   </div>

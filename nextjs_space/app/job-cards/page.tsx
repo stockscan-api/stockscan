@@ -30,7 +30,7 @@ interface JobCard {
   description?: string;
   customerName?: string;
   startDate?: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'OPEN';
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'OPEN' | 'CLOSED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   assignedToUserId?: string;
   assignedTo?: { id: string; name: string; email: string };
@@ -56,6 +56,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
   IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-100 text-blue-700', icon: Loader2 },
   COMPLETED: { label: 'Completed', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
   CANCELLED: { label: 'Cancelled', color: 'bg-gray-100 text-gray-700', icon: XCircle },
+  CLOSED: { label: 'Closed', color: 'bg-slate-100 text-slate-700', icon: CheckCircle2 },
 };
 
 const priorityConfig = {
@@ -236,6 +237,7 @@ export default function JobCardsPage() {
               <option value="PENDING">Pending</option>
               <option value="IN_PROGRESS">In Progress</option>
               <option value="COMPLETED">Completed</option>
+              <option value="CLOSED">Closed</option>
               <option value="CANCELLED">Cancelled</option>
             </select>
 
