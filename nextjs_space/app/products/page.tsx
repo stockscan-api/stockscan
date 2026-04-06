@@ -23,6 +23,8 @@ interface Product {
   sku: string;
   description?: string;
   price: number;
+  unitPrice?: number;
+  costPrice?: number;
   currentStock: number;
   minimumStock: number;
   category?: { id: string; name: string };
@@ -132,7 +134,7 @@ export default function ProductsPage() {
         name: product?.name || '',
         sku: product?.sku || '',
         description: product?.description || '',
-        price: String(product?.price || ''),
+        price: String(((product?.unitPrice ?? product?.price) || '')),
         currentStock: String(product?.currentStock || ''),
         minimumStock: String(product?.minimumStock || ''),
         categoryId: product?.categoryId || '',
@@ -234,7 +236,7 @@ export default function ProductsPage() {
       key: 'price',
       header: 'Price',
       render: (product: Product) => (
-        <span className="font-medium">{formatPrice(product?.price || 0)}</span>
+        <span className="font-medium">{formatPrice(((product?.unitPrice ?? product?.price) || 0))}</span>
       ),
     },
     {
@@ -437,7 +439,7 @@ export default function ProductsPage() {
                           <h3 className="font-semibold text-gray-900 mb-1">{product?.name}</h3>
                           <p className="text-sm text-gray-500 mb-2">SKU: {product?.sku}</p>
                           <p className="text-lg font-bold text-blue-600 mb-3">
-                            {formatPrice(product?.price || 0)}
+                            {formatPrice(((product?.unitPrice ?? product?.price) || 0))}
                           </p>
                           <div className="flex items-center gap-2">
                             <Button variant="outline" size="sm" className="flex-1" onClick={() => handleOpenModal(product)}>

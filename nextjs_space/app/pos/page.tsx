@@ -119,7 +119,7 @@ export default function PosPage() {
         productId: product.id,
         name: product.name,
         sku: product.sku,
-        price: product.sellingPrice ?? product.price ?? 0,
+        price: product.unitPrice ?? product.sellingPrice ?? product.price ?? 0,
         quantity: 1,
       }];
     });
@@ -262,7 +262,7 @@ export default function PosPage() {
                         <span className="text-xs text-gray-500 font-mono">{product.sku}</span>
                       </div>
                       <p className="font-medium text-gray-900 text-sm truncate">{product.name}</p>
-                      <p className="text-blue-600 font-bold mt-1">£{(product.sellingPrice ?? product.price ?? 0).toFixed(2)}</p>
+                      <p className="text-blue-600 font-bold mt-1">£{(product.unitPrice ?? product.sellingPrice ?? product.price ?? 0).toFixed(2)}</p>
                       <p className="text-xs text-gray-500 mt-0.5">Stock: {product.quantity ?? product.stockLevel ?? 0}</p>
                     </button>
                   ))}

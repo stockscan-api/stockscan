@@ -77,7 +77,7 @@ export default function DashboardPage() {
       setLowStockProducts(lowStockItems);
 
       // Calculate stats using API totals
-      const totalValue = allProducts.reduce((sum: number, p: any) => sum + ((p?.price || 0) * (p?.currentStock || 0)), 0);
+      const totalValue = allProducts.reduce((sum: number, p: any) => sum + (((p?.unitPrice ?? p?.price ?? 0)) * ((p?.quantity ?? p?.currentStock) || 0)), 0);
       setStats({
         totalProducts: totalProductsCount,
         lowStockCount: lowStockCount,
@@ -96,8 +96,8 @@ export default function DashboardPage() {
     if (!acc[category]) {
       acc[category] = { name: category, count: 0, value: 0 };
     }
-    acc[category].count += product?.currentStock || 0;
-    acc[category].value += (product?.price || 0) * (product?.currentStock || 0);
+    acc[category].count += (product?.quantity ?? product?.currentStock) || 0;
+    acc[category].value += ((product?.unitPrice ?? product?.price ?? 0)) * ((product?.quantity ?? product?.currentStock) || 0);
     return acc;
   }, {}) ?? {};
 
@@ -273,7 +273,7 @@ export default function DashboardPage() {
                         <p className="text-xs text-gray-500">SKU: {product?.sku}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-red-600">{product?.currentStock} / {product?.minimumStock}</p>
+                        <p className="text-sm font-semibold text-red-600">{product?.quantity ?? product?.currentStock} / {product?.minimumStock}</p>
                         <p className="text-xs text-gray-500">Current / Min</p>
                       </div>
                     </div>
