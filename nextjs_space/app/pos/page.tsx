@@ -71,9 +71,11 @@ export default function PosPage() {
   const fetchProducts = useCallback(async () => {
     try {
       const res = await apiClient.getProducts({ limit: 100 });
-      setProducts(res.items || res.data || res || []);
+      const list = res?.products || res?.items || res?.data || (Array.isArray(res) ? res : []);
+      setProducts(Array.isArray(list) ? list : []);
     } catch (err) {
       console.error('Failed to load products:', err);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -83,7 +85,8 @@ export default function PosPage() {
     setLoadingSales(true);
     try {
       const res = await apiClient.getPosSales({ limit: 50 });
-      setSales(res.items || res.data || res.sales || res || []);
+      const list = res?.sales || res?.items || res?.data || (Array.isArray(res) ? res : []);
+      setSales(Array.isArray(list) ? list : []);
     } catch (err: any) {
       console.error('Failed to load sales:', err);
       toast.error('Failed to load sales history');
