@@ -223,45 +223,160 @@ export default function PosPage() {
   };
 
   const handlePrintReceipt = () => {
-    if (!receiptRef.current) return;
-    const printContent = receiptRef.current.innerHTML;
-    const w = window.open('', '_blank', 'width=420,height=650');
+    if (!invoiceData) return;
+    const inv = invoiceData;
+    const dateStr = new Date(inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const timeStr = new Date(inv.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    const itemRows = inv.items.map(item => `
+      <tr>
+        <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb;">${item.name}${item.sku ? `<br><span style="font-size:11px;color:#9ca3af;font-family:monospace;">${item.sku}</span>` : ''}</td>
+        <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:center;">${item.quantity}</td>
+        <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:right;">£${item.unitPrice.toFixed(2)}</td>
+        <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:right; font-weight:600;">£${item.lineTotal.toFixed(2)}</td>
+      </tr>
+    `).join('');
+
+    const w = window.open('', '_blank');
     if (w) {
-      w.document.write(`
-        <html>
-          <head>
-            <title>Invoice / Receipt</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; color: #1a1a1a; max-width: 400px; margin: 0 auto; }
-              .receipt-header { text-align: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb; }
-              .receipt-header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-              .receipt-header p { font-size: 12px; color: #6b7280; }
-              .receipt-meta { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-bottom: 16px; font-size: 13px; }
-              .receipt-meta span { color: #6b7280; }
-              .receipt-meta strong { color: #1a1a1a; }
-              .items-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-              .items-table th { text-align: left; font-size: 11px; text-transform: uppercase; color: #6b7280; border-bottom: 1px solid #e5e7eb; padding: 8px 4px; }
-              .items-table th:last-child { text-align: right; }
-              .items-table td { padding: 8px 4px; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
-              .items-table td:last-child { text-align: right; font-weight: 600; }
-              .totals { border-top: 2px solid #e5e7eb; padding-top: 12px; }
-              .totals .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
-              .totals .row.grand { font-size: 18px; font-weight: 700; padding-top: 8px; margin-top: 8px; border-top: 2px solid #1a1a1a; }
-              .totals .row.grand .amount { color: #059669; }
-              .payment-badge { display: inline-block; background: #f3f4f6; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-top: 12px; }
-              .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px dashed #d1d5db; font-size: 11px; color: #9ca3af; }
-              @media print { body { padding: 12px; } button { display: none !important; } }
-            </style>
-          </head>
-          <body>
-            ${printContent}
-            <script>
-              setTimeout(function() { window.print(); }, 300);
-            <\/script>
-          </body>
-        </html>
-      `);
+      w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Invoice ${inv.saleNumber}</title>
+  <style>
+    @page { size: A4; margin: 20mm 15mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #1a1a1a; font-size: 14px; line-height: 1.5; }
+    .page { max-width: 210mm; margin: 0 auto; padding: 40px; }
+    
+    /* Header */
+    .inv-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 3px solid #1e3a5f; }
+    .inv-header .brand h1 { font-size: 28px; font-weight: 800; color: #1e3a5f; letter-spacing: -0.5px; }
+    .inv-header .brand p { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    .inv-header .inv-title { text-align: right; }
+    .inv-header .inv-title h2 { font-size: 24px; font-weight: 700; color: #1e3a5f; text-transform: uppercase; letter-spacing: 2px; }
+    .inv-header .inv-title .inv-num { font-size: 16px; color: #374151; font-family: monospace; margin-top: 4px; }
+    
+    /* Meta Grid */
+    .inv-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 36px; }
+    .meta-block { background: #f9fafb; border-radius: 8px; padding: 16px 20px; }
+    .meta-block .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; font-weight: 600; margin-bottom: 4px; }
+    .meta-block .value { font-size: 15px; font-weight: 600; color: #111827; }
+    
+    /* Items Table */
+    .items-table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+    .items-table thead th { background: #1e3a5f; color: #ffffff; padding: 12px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; text-align: left; }
+    .items-table thead th:nth-child(2) { text-align: center; }
+    .items-table thead th:nth-child(3),
+    .items-table thead th:nth-child(4) { text-align: right; }
+    .items-table tbody td { font-size: 14px; }
+    .items-table tbody tr:nth-child(even) { background: #f9fafb; }
+    
+    /* Totals */
+    .totals-wrapper { display: flex; justify-content: flex-end; }
+    .totals { width: 280px; }
+    .totals .row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+    .totals .row .label { color: #6b7280; }
+    .totals .row .amount { font-weight: 600; color: #111827; }
+    .totals .row.grand { font-size: 20px; font-weight: 800; padding-top: 14px; margin-top: 10px; border-top: 3px solid #1e3a5f; }
+    .totals .row.grand .amount { color: #059669; }
+    
+    /* Payment */
+    .payment-info { margin-top: 28px; padding: 16px 20px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .payment-info .method { font-weight: 700; color: #166534; font-size: 15px; }
+    .payment-info .status { background: #166534; color: white; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
+    
+    /* Footer */
+    .inv-footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #9ca3af; font-size: 12px; }
+    .inv-footer p { margin-bottom: 4px; }
+    
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .page { padding: 0; max-width: none; }
+      button { display: none !important; }
+    }
+    @media screen {
+      body { background: #e5e7eb; padding: 20px; }
+      .page { background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border-radius: 4px; min-height: 297mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="inv-header">
+      <div class="brand">
+        <h1>StockScan</h1>
+        <p>Inventory &amp; Sales Management</p>
+      </div>
+      <div class="inv-title">
+        <h2>Invoice</h2>
+        <div class="inv-num">${inv.saleNumber}</div>
+      </div>
+    </div>
+    
+    <div class="inv-meta">
+      <div class="meta-block">
+        <div class="label">Date &amp; Time</div>
+        <div class="value">${dateStr} at ${timeStr}</div>
+      </div>
+      <div class="meta-block">
+        <div class="label">Customer</div>
+        <div class="value">${inv.customerName}</div>
+      </div>
+      <div class="meta-block">
+        <div class="label">Payment Method</div>
+        <div class="value">${inv.paymentMethod}</div>
+      </div>
+      <div class="meta-block">
+        <div class="label">Served By</div>
+        <div class="value">${inv.soldByName || ''}</div>
+      </div>
+    </div>
+    
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Qty</th>
+          <th>Unit Price</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+      </tbody>
+    </table>
+    
+    <div class="totals-wrapper">
+      <div class="totals">
+        <div class="row">
+          <span class="label">Subtotal (ex. VAT)</span>
+          <span class="amount">£${inv.subtotal.toFixed(2)}</span>
+        </div>
+        <div class="row">
+          <span class="label">VAT @ 20%</span>
+          <span class="amount">£${inv.tax.toFixed(2)}</span>
+        </div>
+        <div class="row grand">
+          <span class="label">Total</span>
+          <span class="amount">£${inv.total.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="payment-info">
+      <span class="method">Paid by ${inv.paymentMethod}</span>
+      <span class="status">PAID</span>
+    </div>
+    
+    <div class="inv-footer">
+      <p>Thank you for your business!</p>
+      <p>Generated by StockScan · ${dateStr}</p>
+    </div>
+  </div>
+  <script>setTimeout(function() { window.print(); }, 400);<\/script>
+</body>
+</html>`);
       w.document.close();
     }
   };
