@@ -24,6 +24,13 @@ export default function LoginPage() {
       // Redirect super admins to admin dashboard, others to regular dashboard
       const redirectPath = isSuperAdmin ? '/admin/dashboard' : '/dashboard';
       router.replace(redirectPath);
+      // Fallback: force navigation if router.replace doesn't trigger
+      const fallbackTimer = setTimeout(() => {
+        if (window.location.pathname === '/login') {
+          window.location.href = redirectPath;
+        }
+      }, 1500);
+      return () => clearTimeout(fallbackTimer);
     }
   }, [isAuthenticated, authLoading, isSuperAdmin, router]);
 
@@ -33,12 +40,18 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await login(email, password);
+      await login(email, password);
       toast.success('Login successful!');
       // Check if user is super admin from the login response
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const redirectPath = user?.role === 'SUPER_ADMIN' ? '/admin/dashboard' : '/dashboard';
       router.replace(redirectPath);
+      // Fallback: force navigation if router.replace doesn't trigger
+      setTimeout(() => {
+        if (window.location.pathname === '/login') {
+          window.location.href = redirectPath;
+        }
+      }, 1500);
     } catch (err: any) {
       setError(err?.message || 'Invalid email or password');
       toast.error(err?.message || 'Login failed');
@@ -56,7 +69,11 @@ export default function LoginPage() {
   }
 
   if (isAuthenticated) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+      </div>
+    );
   }
 
   return (
