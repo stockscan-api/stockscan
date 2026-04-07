@@ -21,6 +21,9 @@ import {
   X,
   History,
   Eye,
+  Printer,
+  ArrowLeft,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface CartItem {
@@ -44,10 +47,22 @@ interface Sale {
   createdAt: string;
 }
 
-type PosView = 'sell' | 'history';
+interface CompletedSaleData {
+  id: string;
+  saleNumber?: string;
+  items: CartItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  paymentMethod: string;
+  customerName: string;
+  createdAt: string;
+}
+
+type PosView = 'sell' | 'history' | 'receipt';
 
 export default function PosPage() {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const canRefund = hasRole(['MANAGER', 'OWNER']);
   const [view, setView] = useState<PosView>('sell');
   const [products, setProducts] = useState<any[]>([]);
@@ -58,6 +73,9 @@ export default function PosPage() {
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Completed sale for receipt view
+  const [completedSale, setCompletedSale] = useState<CompletedSaleData | null>(null);
+
   // Sales history
   const [sales, setSales] = useState<Sale[]>([]);
   const [loadingSales, setLoadingSales] = useState(false);
@@ -67,6 +85,7 @@ export default function PosPage() {
   const [refundingSaleId, setRefundingSaleId] = useState<string | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -157,28 +176,77 @@ export default function PosPage() {
       };
       const result = await apiClient.createPosSale(saleData);
       toast.success('Sale completed successfully!');
+
+      // Store completed sale data for receipt view
+      const saleRecord: CompletedSaleData = {
+        id: result?.id || '',
+        saleNumber: result?.saleNumber || result?.id?.slice(0, 8) || 'N/A',
+        items: [...cart],
+        subtotal,
+        tax,
+        total,
+        paymentMethod,
+        customerName: customerName || 'Walk-in Customer',
+        createdAt: new Date().toISOString(),
+      };
+      setCompletedSale(saleRecord);
       setCart([]);
       setCustomerName('');
-
-      // Try to show receipt
-      if (result?.id) {
-        try {
-          const receipt = await apiClient.getPosReceipt(result.id);
-          if (receipt) {
-            const w = window.open('', '_blank', 'width=400,height=600');
-            if (w) {
-              const html = typeof receipt === 'string' ? receipt : receipt.html || `<pre>${JSON.stringify(receipt, null, 2)}</pre>`;
-              w.document.write(`<html><head><title>Receipt</title></head><body>${html}<script>window.print();<\/script></body></html>`);
-              w.document.close();
-            }
-          }
-        } catch { /* receipt optional */ }
-      }
+      setView('receipt');
     } catch (err: any) {
       toast.error(err.message || 'Checkout failed');
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handlePrintReceipt = () => {
+    if (!receiptRef.current) return;
+    const printContent = receiptRef.current.innerHTML;
+    const w = window.open('', '_blank', 'width=420,height=650');
+    if (w) {
+      w.document.write(`
+        <html>
+          <head>
+            <title>Invoice / Receipt</title>
+            <style>
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; color: #1a1a1a; max-width: 400px; margin: 0 auto; }
+              .receipt-header { text-align: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb; }
+              .receipt-header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+              .receipt-header p { font-size: 12px; color: #6b7280; }
+              .receipt-meta { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-bottom: 16px; font-size: 13px; }
+              .receipt-meta span { color: #6b7280; }
+              .receipt-meta strong { color: #1a1a1a; }
+              .items-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+              .items-table th { text-align: left; font-size: 11px; text-transform: uppercase; color: #6b7280; border-bottom: 1px solid #e5e7eb; padding: 8px 4px; }
+              .items-table th:last-child { text-align: right; }
+              .items-table td { padding: 8px 4px; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
+              .items-table td:last-child { text-align: right; font-weight: 600; }
+              .totals { border-top: 2px solid #e5e7eb; padding-top: 12px; }
+              .totals .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+              .totals .row.grand { font-size: 18px; font-weight: 700; padding-top: 8px; margin-top: 8px; border-top: 2px solid #1a1a1a; }
+              .totals .row.grand .amount { color: #059669; }
+              .payment-badge { display: inline-block; background: #f3f4f6; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-top: 12px; }
+              .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px dashed #d1d5db; font-size: 11px; color: #9ca3af; }
+              @media print { body { padding: 12px; } button { display: none !important; } }
+            </style>
+          </head>
+          <body>
+            ${printContent}
+            <script>
+              setTimeout(function() { window.print(); }, 300);
+            <\/script>
+          </body>
+        </html>
+      `);
+      w.document.close();
+    }
+  };
+
+  const handleNewSale = () => {
+    setCompletedSale(null);
+    setView('sell');
   };
 
   const handleRefund = async () => {
@@ -228,7 +296,121 @@ export default function PosPage() {
           </div>
         </div>
 
-        {view === 'sell' ? (
+        {view === 'receipt' && completedSale ? (
+          /* Receipt / Invoice View */
+          <div className="max-w-lg mx-auto space-y-6">
+            {/* Success Banner */}
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+              <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-green-800">Sale Completed Successfully</p>
+                <p className="text-sm text-green-600">Invoice is ready to print below</p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={handleNewSale}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                New Sale
+              </button>
+              <button
+                onClick={handlePrintReceipt}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+              >
+                <Printer className="h-4 w-4" />
+                Print Invoice
+              </button>
+            </div>
+
+            {/* Printable Receipt Content */}
+            <div ref={receiptRef} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              <div className="p-6 space-y-5">
+                {/* Header */}
+                <div className="receipt-header text-center pb-4 border-b-2 border-gray-200">
+                  <h1 className="text-2xl font-bold text-gray-900">StockScan</h1>
+                  <p className="text-xs text-gray-500 mt-1">SALES INVOICE / RECEIPT</p>
+                </div>
+
+                {/* Sale Meta */}
+                <div className="receipt-meta grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500 block text-xs">Invoice #</span>
+                    <strong className="text-gray-900 font-mono">{completedSale.saleNumber}</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-500 block text-xs">Date</span>
+                    <strong className="text-gray-900">{new Date(completedSale.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block text-xs">Customer</span>
+                    <strong className="text-gray-900">{completedSale.customerName}</strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-500 block text-xs">Payment</span>
+                    <span className="payment-badge inline-block bg-gray-100 px-2.5 py-0.5 rounded-full text-xs font-semibold text-gray-700">{completedSale.paymentMethod}</span>
+                  </div>
+                  {user?.name && (
+                    <div className="col-span-2">
+                      <span className="text-gray-500 block text-xs">Served by</span>
+                      <strong className="text-gray-900">{user.name}</strong>
+                    </div>
+                  )}
+                </div>
+
+                {/* Items Table */}
+                <table className="items-table w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-2 text-xs font-medium text-gray-500 uppercase">Item</th>
+                      <th className="text-center py-2 text-xs font-medium text-gray-500 uppercase">Qty</th>
+                      <th className="text-right py-2 text-xs font-medium text-gray-500 uppercase">Price</th>
+                      <th className="text-right py-2 text-xs font-medium text-gray-500 uppercase">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {completedSale.items.map((item, idx) => (
+                      <tr key={idx} className="border-b border-gray-100">
+                        <td className="py-2.5">
+                          <span className="text-gray-900 font-medium">{item.name}</span>
+                          <span className="block text-xs text-gray-400 font-mono">{item.sku}</span>
+                        </td>
+                        <td className="py-2.5 text-center text-gray-700">{item.quantity}</td>
+                        <td className="py-2.5 text-right text-gray-600">£{item.price.toFixed(2)}</td>
+                        <td className="py-2.5 text-right font-semibold text-gray-900">£{(item.price * item.quantity).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Totals */}
+                <div className="totals border-t-2 border-gray-200 pt-3 space-y-1">
+                  <div className="row flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="font-medium text-gray-900">£{completedSale.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="row flex justify-between text-sm">
+                    <span className="text-gray-600">VAT (20%)</span>
+                    <span className="font-medium text-gray-900">£{completedSale.tax.toFixed(2)}</span>
+                  </div>
+                  <div className="row grand flex justify-between text-xl font-bold pt-3 mt-2 border-t-2 border-gray-900">
+                    <span>Total</span>
+                    <span className="amount text-green-600">£{completedSale.total.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="footer text-center pt-4 mt-4 border-t border-dashed border-gray-300">
+                  <p className="text-xs text-gray-400">Thank you for your purchase!</p>
+                  <p className="text-xs text-gray-400 mt-1">Powered by StockScan</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : view === 'sell' ? (
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             {/* Product Search - Left Side */}
             <div className="lg:col-span-3 space-y-4">
