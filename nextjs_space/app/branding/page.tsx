@@ -35,6 +35,7 @@ export default function BrandingPage() {
   const [saving, setSaving] = useState(false);
 
   // Branding state
+  const [companyId, setCompanyId] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [logo, setLogo] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#3b82f6');
@@ -49,23 +50,44 @@ export default function BrandingPage() {
   const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
   const [savingFlags, setSavingFlags] = useState(false);
 
+  // Helper to get/set branding from localStorage per company
+  const getBrandingKey = (cId: string) => `stockscan_branding_${cId}`;
+  const loadLocalBranding = (cId: string) => {
+    try {
+      const raw = localStorage.getItem(getBrandingKey(cId));
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  };
+  const saveLocalBranding = (cId: string, data: { logo: string; primaryColor: string; secondaryColor: string }) => {
+    try {
+      localStorage.setItem(getBrandingKey(cId), JSON.stringify(data));
+    } catch {}
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [company, flags] = await Promise.allSettled([
-        apiClient.getCompanyBranding(),
+        apiClient.getCompanyProfile(),
         apiClient.getFeatureFlags(),
       ]);
       if (company.status === 'fulfilled' && company.value) {
         const c = company.value;
-        setCompanyName(c.name || c.companyName || '');
-        setLogo(c.logo || c.logoUrl || '');
-        setPrimaryColor(c.primaryColor || c.branding?.primaryColor || '#3b82f6');
-        setSecondaryColor(c.secondaryColor || c.branding?.secondaryColor || '#10b981');
+        const cId = c.id || '';
+        setCompanyId(cId);
+        setCompanyName(c.name || '');
+
+        // Load logo/colors from localStorage (not on backend)
+        const local = loadLocalBranding(cId);
+        if (local) {
+          setLogo(local.logo || '');
+          setPrimaryColor(local.primaryColor || '#3b82f6');
+          setSecondaryColor(local.secondaryColor || '#10b981');
+        }
       }
       if (flags.status === 'fulfilled' && flags.value) {
         const f = flags.value;
-        // could be an object or { flags: {...} }
         setFeatureFlags(f.flags || f || {});
       }
     } catch (err) {
@@ -73,6 +95,7 @@ export default function BrandingPage() {
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -82,12 +105,14 @@ export default function BrandingPage() {
   const handleSaveBranding = async () => {
     setSaving(true);
     try {
-      await apiClient.updateBranding({
-        companyName,
-        logo,
-        primaryColor,
-        secondaryColor,
-      });
+      // Save company name to backend
+      if (companyId) {
+        await apiClient.updateCompanyDetails(companyId, { name: companyName });
+      }
+      // Save logo & colors to localStorage (backend doesn't support these yet)
+      if (companyId) {
+        saveLocalBranding(companyId, { logo, primaryColor, secondaryColor });
+      }
       toast.success('Branding updated successfully');
     } catch (err: any) {
       toast.error(err.message || 'Failed to update branding');

@@ -852,12 +852,18 @@ class ApiClient {
 
   // ============ COMPANY BRANDING ============
 
-  async getCompanyBranding() {
-    return this.request<any>('/api/company');
+  async getCompanyProfile() {
+    // Get current user's company from auth profile
+    const profile = await this.request<any>('/api/auth/profile');
+    if (profile?.company) return profile.company;
+    if (profile?.companyId) {
+      return this.request<any>(`/api/company/${profile.companyId}`);
+    }
+    throw new Error('No company found');
   }
 
-  async updateBranding(data: { companyName?: string; logo?: string; primaryColor?: string; secondaryColor?: string }) {
-    return this.request<any>('/api/company/branding', { method: 'PUT', body: JSON.stringify(data) });
+  async updateCompanyDetails(companyId: string, data: { name?: string; email?: string; phone?: string; address?: string }) {
+    return this.request<any>(`/api/company/${companyId}`, { method: 'PATCH', body: JSON.stringify(data) });
   }
 }
 
