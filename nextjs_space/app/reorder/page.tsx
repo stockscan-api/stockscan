@@ -34,13 +34,22 @@ export default function ReorderPage() {
     try {
       // Get all products with low stock
       const response = await apiClient.getProducts({ lowStock: true, limit: 200 });
-      const lowStockProducts = response?.data || response || [];
+      const lowStockProducts = response?.products || response?.data || (Array.isArray(response) ? response : []);
       
-      const reorderItems = lowStockProducts?.map((product: any) => ({
-        id: product?.id,
-        product,
-        reorderQty: Math.max((product?.minimumStock || 0) * 2 - (product?.currentStock || 0), product?.minimumStock || 10),
-      }));
+      const reorderItems = lowStockProducts?.map((product: any) => {
+        const currentStock = product?.quantity ?? product?.currentStock ?? 0;
+        const minStock = product?.reorderThreshold ?? product?.minimumStock ?? 0;
+        return {
+          id: product?.id,
+          product: {
+            ...product,
+            currentStock,
+            minimumStock: minStock,
+            price: product?.unitPrice ?? product?.price ?? 0,
+          },
+          reorderQty: Math.max(minStock * 2 - currentStock, minStock || 10),
+        };
+      });
 
       setItems(reorderItems);
 
