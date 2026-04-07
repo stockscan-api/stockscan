@@ -320,35 +320,35 @@ class ApiClient {
 
   // License / Subscription
   async activateLicense(licenseKey: string) {
-    return this.request<any>('/license/activate', {
+    return this.request<any>('/api/license/activate', {
       method: 'POST',
       body: JSON.stringify({ licenseKey }),
     });
   }
 
   async getTierLimits() {
-    return this.request<any>('/license/limits');
+    return this.request<any>('/api/license/limits');
   }
 
   async getSubscription() {
-    return this.request<any>('/subscriptions/my-subscription');
+    return this.request<any>('/api/subscriptions/my-subscription');
   }
 
   async getUsage() {
-    return this.request<any>('/subscriptions/usage');
+    return this.request<any>('/api/subscriptions/usage');
   }
 
   // Import
   async previewImport(file: File) {
     const formData = new FormData();
     formData.append('file', file);
-    return this.requestFormData<any>('/import/products/preview', formData);
+    return this.requestFormData<any>('/api/import/products/preview', formData);
   }
 
   async importProducts(file: File) {
     const formData = new FormData();
     formData.append('file', file);
-    return this.requestFormData<any>('/import/products', formData);
+    return this.requestFormData<any>('/api/import/products', formData);
   }
 
   // Profile
@@ -392,7 +392,7 @@ class ApiClient {
 
   // License Key Management (Admin)
   async generateLicenseKeys(data: { tier: string; duration: number; notes?: string; count: number }) {
-    return this.request<any>('/license/generate', {
+    return this.request<any>('/api/license/generate', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -405,15 +405,15 @@ class ApiClient {
     if (params?.tier) searchParams.append('tier', params.tier);
     if (params?.status) searchParams.append('status', params.status);
     const query = searchParams.toString();
-    return this.request<any>(`/license/all${query ? `?${query}` : ''}`);
+    return this.request<any>(`/api/license/all${query ? `?${query}` : ''}`);
   }
 
   async checkLicenseKey(key: string) {
-    return this.request<any>(`/license/check/${key}`);
+    return this.request<any>(`/api/license/check/${key}`);
   }
 
   async deleteLicenseKey(id: string) {
-    return this.request<void>(`/license/${id}`, { method: 'DELETE' });
+    return this.request<void>(`/api/license/${id}`, { method: 'DELETE' });
   }
 
   // Audit Logs
@@ -459,17 +459,17 @@ class ApiClient {
     if (params?.priority) searchParams.append('priority', params.priority);
     if (params?.assignedToUserId) searchParams.append('assignedToUserId', params.assignedToUserId);
     const query = searchParams.toString();
-    return this.request<any>(`/job-cards${query ? `?${query}` : ''}`);
+    return this.request<any>(`/api/job-cards${query ? `?${query}` : ''}`);
   }
 
   // Get my assigned job cards
   async getMyJobCards() {
-    return this.request<any>('/job-cards/my-jobs');
+    return this.request<any>('/api/job-cards/my-jobs');
   }
 
   // Get single job card with allocations
   async getJobCard(id: string) {
-    return this.request<any>(`/job-cards/${id}`);
+    return this.request<any>(`/api/job-cards/${id}`);
   }
 
   // Create job card - Backend uses jobName, customerName, startDate
@@ -482,7 +482,7 @@ class ApiClient {
     assignedToUserId?: string;
     estimatedEndDate?: string;
   }) {
-    return this.request<any>('/job-cards', {
+    return this.request<any>('/api/job-cards', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -490,7 +490,7 @@ class ApiClient {
 
   // Update job card
   async updateJobCard(id: string, data: { title?: string; description?: string; customerName?: string; priority?: string; status?: string; assignedToUserId?: string }) {
-    return this.request<any>(`/job-cards/${id}`, {
+    return this.request<any>(`/api/job-cards/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -498,14 +498,14 @@ class ApiClient {
 
   // Delete job card
   async deleteJobCard(id: string) {
-    return this.request<void>(`/job-cards/${id}`, {
+    return this.request<void>(`/api/job-cards/${id}`, {
       method: 'DELETE',
     });
   }
 
   // Allocate stock to job card
   async allocateStockToJob(jobCardId: string, data: { stockItemId: string; quantity: number }) {
-    return this.request<any>(`/job-cards/${jobCardId}/allocate-stock`, {
+    return this.request<any>(`/api/job-cards/${jobCardId}/allocate-stock`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -513,7 +513,7 @@ class ApiClient {
 
   // Return stock from job card
   async returnStockFromJob(jobCardId: string, data: { stockItemId: string; quantity: number }) {
-    return this.request<any>(`/job-cards/${jobCardId}/return-stock`, {
+    return this.request<any>(`/api/job-cards/${jobCardId}/return-stock`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -521,7 +521,7 @@ class ApiClient {
 
   // Update job card status
   async updateJobCardStatus(id: string, data: { status: string; actualCompletionDate?: string }) {
-    return this.request<any>(`/job-cards/${id}/status`, {
+    return this.request<any>(`/api/job-cards/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -554,7 +554,7 @@ class ApiClient {
     dateWorked: string;
     description?: string;
   }) {
-    return this.request<any>(`/job-cards/${jobCardId}/labour`, {
+    return this.request<any>(`/api/job-cards/${jobCardId}/labour`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -567,7 +567,7 @@ class ApiClient {
     dateWorked?: string;
     description?: string;
   }) {
-    return this.request<any>(`/job-cards/${jobCardId}/labour/${labourId}`, {
+    return this.request<any>(`/api/job-cards/${jobCardId}/labour/${labourId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -575,7 +575,7 @@ class ApiClient {
 
   // Delete labour entry
   async deleteLabourEntry(jobCardId: string, labourId: string) {
-    return this.request<any>(`/job-cards/${jobCardId}/labour/${labourId}`, {
+    return this.request<any>(`/api/job-cards/${jobCardId}/labour/${labourId}`, {
       method: 'DELETE',
     });
   }
@@ -762,7 +762,7 @@ class ApiClient {
 
   // Add note to job card
   async addJobCardNote(jobCardId: string, content: string) {
-    return this.request<any>(`/job-cards/${jobCardId}/notes`, {
+    return this.request<any>(`/api/job-cards/${jobCardId}/notes`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
@@ -770,7 +770,7 @@ class ApiClient {
 
   // Update job card notes (PUT /job-cards/:id/notes)
   async updateJobCardNotes(jobCardId: string, notes: string) {
-    return this.request<any>(`/job-cards/${jobCardId}/notes`, {
+    return this.request<any>(`/api/job-cards/${jobCardId}/notes`, {
       method: 'PUT',
       body: JSON.stringify({ notes }),
     });
@@ -780,19 +780,19 @@ class ApiClient {
 
   // Get job card activity log
   async getJobCardActivity(jobCardId: string) {
-    return this.request<any>(`/job-cards/${jobCardId}/activity`);
+    return this.request<any>(`/api/job-cards/${jobCardId}/activity`);
   }
 
   // ============ JOB CARD INVOICE & EXPORT ============
 
   // Generate job card invoice
   async getJobCardInvoice(jobCardId: string) {
-    return this.request<any>(`/job-cards/${jobCardId}/invoice`);
+    return this.request<any>(`/api/job-cards/${jobCardId}/invoice`);
   }
 
   // Export job card to Sage CSV
   async exportJobCardSageCSV(jobCardId: string) {
-    return this.request<any>(`/job-cards/${jobCardId}/export-sage`);
+    return this.request<any>(`/api/job-cards/${jobCardId}/export-sage`);
   }
 
   // ============ REPORTS ============
