@@ -799,65 +799,65 @@ class ApiClient {
 
   async getReportSales(params: { startDate: string; endDate: string; format?: string }) {
     const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/reports/sales?${query}`);
+    return this.request<any>(`/api/reports/sales?${query}`);
   }
 
   async getReportStock(params: { startDate: string; endDate: string; format?: string }) {
     const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/reports/stock?${query}`);
+    return this.request<any>(`/api/reports/stock?${query}`);
   }
 
   async getReportJobCards(params: { startDate: string; endDate: string; format?: string }) {
     const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/reports/job-cards?${query}`);
+    return this.request<any>(`/api/reports/job-cards?${query}`);
   }
 
   async getReportProfitLoss(params: { startDate: string; endDate: string; format?: string }) {
     const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/reports/profit-loss?${query}`);
+    return this.request<any>(`/api/reports/profit-loss?${query}`);
   }
 
   // ============ POS (Point of Sale) ============
 
   async getPosSales(params?: { page?: number; limit?: number }) {
     const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
-    return this.request<any>(`/pos/sales${query}`);
+    return this.request<any>(`/api/pos/sales${query}`);
   }
 
   async getPosSale(saleId: string) {
-    return this.request<any>(`/pos/sales/${saleId}`);
+    return this.request<any>(`/api/pos/sales/${saleId}`);
   }
 
-  async createPosSale(data: { items: Array<{ productId: string; quantity: number; price: number }>; paymentMethod: string; customerName?: string; notes?: string }) {
-    return this.request<any>('/pos/sales', { method: 'POST', body: JSON.stringify(data) });
+  async createPosSale(data: { items: Array<{ productId: string; productName: string; quantity: number; unitPrice: number }>; paymentMethod: string; amountTendered: number; customerName?: string; notes?: string }) {
+    return this.request<any>('/api/pos/sales', { method: 'POST', body: JSON.stringify(data) });
   }
 
   async refundPosSale(saleId: string, data?: { reason?: string }) {
-    return this.request<any>(`/pos/sales/${saleId}/refund`, { method: 'POST', body: JSON.stringify(data || {}) });
+    return this.request<any>(`/api/pos/sales/${saleId}/refund`, { method: 'POST', body: JSON.stringify(data || {}) });
   }
 
   async getPosReceipt(saleId: string) {
-    return this.request<any>(`/pos/receipt/${saleId}`);
+    return this.request<any>(`/api/pos/receipt/${saleId}`);
   }
 
   // ============ FEATURE FLAGS ============
 
   async getFeatureFlags() {
-    return this.request<any>('/feature-flags');
+    return this.request<any>('/api/feature-flags');
   }
 
   async updateFeatureFlags(flags: Record<string, boolean>) {
-    return this.request<any>('/feature-flags', { method: 'PUT', body: JSON.stringify(flags) });
+    return this.request<any>('/api/feature-flags', { method: 'PUT', body: JSON.stringify(flags) });
   }
 
   // ============ COMPANY BRANDING ============
 
   async getCompanyBranding() {
-    return this.request<any>('/company');
+    return this.request<any>('/api/company');
   }
 
   async updateBranding(data: { companyName?: string; logo?: string; primaryColor?: string; secondaryColor?: string }) {
-    return this.request<any>('/company/branding', { method: 'PUT', body: JSON.stringify(data) });
+    return this.request<any>('/api/company/branding', { method: 'PUT', body: JSON.stringify(data) });
   }
 }
 

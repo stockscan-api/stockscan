@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { useAuth } from '@/contexts/auth-context';
 import { apiClient } from '@/lib/api-client';
-import { toast } from 'sonner';
+import toast from 'react-hot-toast';
 import {
   ShoppingCart,
   Search,
@@ -170,24 +170,30 @@ export default function PosPage() {
     setProcessing(true);
     try {
       const saleData = {
-        items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+        items: cart.map(i => ({
+          productId: i.productId,
+          productName: i.name,
+          quantity: i.quantity,
+          unitPrice: i.price,
+        })),
         paymentMethod,
         customerName: customerName || undefined,
+        amountTendered: total,
       };
       const result = await apiClient.createPosSale(saleData);
       toast.success('Sale completed successfully!');
 
-      // Store completed sale data for receipt view
+      // Store completed sale data for receipt view — prefer backend values
       const saleRecord: CompletedSaleData = {
         id: result?.id || '',
-        saleNumber: result?.saleNumber || result?.id?.slice(0, 8) || 'N/A',
+        saleNumber: result?.saleNumber || result?.receiptNumber || result?.id?.slice(0, 8) || 'N/A',
         items: [...cart],
-        subtotal,
-        tax,
-        total,
-        paymentMethod,
-        customerName: customerName || 'Walk-in Customer',
-        createdAt: new Date().toISOString(),
+        subtotal: result?.subtotal ?? subtotal,
+        tax: result?.totalVAT ?? tax,
+        total: result?.total ?? total,
+        paymentMethod: result?.payments?.[0]?.paymentMethod || paymentMethod,
+        customerName: result?.customerName || customerName || 'Walk-in Customer',
+        createdAt: result?.createdAt || new Date().toISOString(),
       };
       setCompletedSale(saleRecord);
       setCart([]);

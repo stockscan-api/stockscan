@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { useAuth } from '@/contexts/auth-context';
 import { apiClient } from '@/lib/api-client';
-import { toast } from 'sonner';
+import toast from 'react-hot-toast';
 import {
   BarChart3,
   TrendingUp,
@@ -111,7 +111,7 @@ export default function ReportsPage() {
         a.click();
         URL.revokeObjectURL(url);
       } else {
-        toast.info('CSV export not available for this report');
+        toast('CSV export not available for this report', { icon: 'ℹ️' });
       }
     } catch (err: any) {
       toast.error(err.message || 'Export failed');
