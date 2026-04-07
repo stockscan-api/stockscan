@@ -47,15 +47,23 @@ interface Sale {
   createdAt: string;
 }
 
-interface CompletedSaleData {
+interface InvoiceData {
   id: string;
   saleNumber?: string;
-  items: CartItem[];
+  receiptNumber?: string;
+  items: Array<{
+    name: string;
+    sku?: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+  }>;
   subtotal: number;
   tax: number;
   total: number;
   paymentMethod: string;
   customerName: string;
+  soldByName?: string;
   createdAt: string;
 }
 
@@ -73,8 +81,8 @@ export default function PosPage() {
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Completed sale for receipt view
-  const [completedSale, setCompletedSale] = useState<CompletedSaleData | null>(null);
+  // Invoice data for receipt view (works for both new sales and historical lookups)
+  const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
 
   // Sales history
   const [sales, setSales] = useState<Sale[]>([]);
@@ -183,19 +191,27 @@ export default function PosPage() {
       const result = await apiClient.createPosSale(saleData);
       toast.success('Sale completed successfully!');
 
-      // Store completed sale data for receipt view — prefer backend values
-      const saleRecord: CompletedSaleData = {
+      // Build invoice from backend response + cart data
+      const invoice: InvoiceData = {
         id: result?.id || '',
         saleNumber: result?.saleNumber || result?.receiptNumber || result?.id?.slice(0, 8) || 'N/A',
-        items: [...cart],
+        receiptNumber: result?.receiptNumber,
+        items: (result?.items || cart).map((item: any) => ({
+          name: item.productName || item.name || 'Item',
+          sku: item.sku || cart.find(c => c.productId === item.productId)?.sku || '',
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice ?? item.price ?? 0,
+          lineTotal: item.lineTotal ?? (item.unitPrice ?? item.price ?? 0) * (item.quantity || 1),
+        })),
         subtotal: result?.subtotal ?? subtotal,
         tax: result?.totalVAT ?? tax,
         total: result?.total ?? total,
         paymentMethod: result?.payments?.[0]?.paymentMethod || paymentMethod,
         customerName: result?.customerName || customerName || 'Walk-in Customer',
+        soldByName: result?.soldByName || user?.name || '',
         createdAt: result?.createdAt || new Date().toISOString(),
       };
-      setCompletedSale(saleRecord);
+      setInvoiceData(invoice);
       setCart([]);
       setCustomerName('');
       setView('receipt');
@@ -251,8 +267,39 @@ export default function PosPage() {
   };
 
   const handleNewSale = () => {
-    setCompletedSale(null);
+    setInvoiceData(null);
     setView('sell');
+  };
+
+  const handleBackToHistory = () => {
+    setInvoiceData(null);
+    setView('history');
+  };
+
+  /** Open invoice view for a historical sale */
+  const viewSaleInvoice = (sale: Sale) => {
+    const invoice: InvoiceData = {
+      id: sale.id,
+      saleNumber: sale.saleNumber || sale.id.slice(0, 8),
+      receiptNumber: (sale as any).receiptNumber,
+      items: (sale.items || []).map((item: any) => ({
+        name: item.productName || item.name || item.product?.name || 'Item',
+        sku: item.sku || item.product?.sku || '',
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice ?? item.price ?? 0,
+        lineTotal: item.lineTotal ?? ((item.unitPrice ?? item.price ?? 0) * (item.quantity || 1)),
+      })),
+      subtotal: sale.subtotal || (sale as any).subtotal || 0,
+      tax: sale.tax || (sale as any).totalVAT || 0,
+      total: sale.total || 0,
+      paymentMethod: (sale as any).payments?.[0]?.paymentMethod || sale.paymentMethod || 'N/A',
+      customerName: sale.customerName || 'Walk-in Customer',
+      soldByName: (sale as any).soldByName || '',
+      createdAt: sale.createdAt,
+    };
+    setInvoiceData(invoice);
+    setSelectedSale(null);
+    setView('receipt');
   };
 
   const handleRefund = async () => {
@@ -302,27 +349,37 @@ export default function PosPage() {
           </div>
         </div>
 
-        {view === 'receipt' && completedSale ? (
+        {view === 'receipt' && invoiceData ? (
           /* Receipt / Invoice View */
           <div className="max-w-lg mx-auto space-y-6">
-            {/* Success Banner */}
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
-              <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
+              <Receipt className="h-6 w-6 text-blue-600 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-green-800">Sale Completed Successfully</p>
-                <p className="text-sm text-green-600">Invoice is ready to print below</p>
+                <p className="font-semibold text-blue-800">Invoice {invoiceData.saleNumber}</p>
+                <p className="text-sm text-blue-600">
+                  {new Date(invoiceData.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </p>
               </div>
             </div>
 
             {/* Action Buttons */}
             <div className="flex items-center justify-between">
-              <button
-                onClick={handleNewSale}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                New Sale
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleNewSale}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  <Plus className="h-4 w-4" />
+                  New Sale
+                </button>
+                <button
+                  onClick={handleBackToHistory}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                >
+                  <History className="h-4 w-4" />
+                  Sales History
+                </button>
+              </div>
               <button
                 onClick={handlePrintReceipt}
                 className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
@@ -345,24 +402,24 @@ export default function PosPage() {
                 <div className="receipt-meta grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-gray-500 block text-xs">Invoice #</span>
-                    <strong className="text-gray-900 font-mono">{completedSale.saleNumber}</strong>
+                    <strong className="text-gray-900 font-mono">{invoiceData.saleNumber}</strong>
                   </div>
                   <div className="text-right">
                     <span className="text-gray-500 block text-xs">Date</span>
-                    <strong className="text-gray-900">{new Date(completedSale.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
+                    <strong className="text-gray-900">{new Date(invoiceData.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
                   </div>
                   <div>
                     <span className="text-gray-500 block text-xs">Customer</span>
-                    <strong className="text-gray-900">{completedSale.customerName}</strong>
+                    <strong className="text-gray-900">{invoiceData.customerName}</strong>
                   </div>
                   <div className="text-right">
                     <span className="text-gray-500 block text-xs">Payment</span>
-                    <span className="payment-badge inline-block bg-gray-100 px-2.5 py-0.5 rounded-full text-xs font-semibold text-gray-700">{completedSale.paymentMethod}</span>
+                    <span className="payment-badge inline-block bg-gray-100 px-2.5 py-0.5 rounded-full text-xs font-semibold text-gray-700">{invoiceData.paymentMethod}</span>
                   </div>
-                  {user?.name && (
+                  {(invoiceData.soldByName || user?.name) && (
                     <div className="col-span-2">
                       <span className="text-gray-500 block text-xs">Served by</span>
-                      <strong className="text-gray-900">{user.name}</strong>
+                      <strong className="text-gray-900">{invoiceData.soldByName || user?.name}</strong>
                     </div>
                   )}
                 </div>
@@ -378,15 +435,15 @@ export default function PosPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {completedSale.items.map((item, idx) => (
+                    {invoiceData.items.map((item, idx) => (
                       <tr key={idx} className="border-b border-gray-100">
                         <td className="py-2.5">
                           <span className="text-gray-900 font-medium">{item.name}</span>
-                          <span className="block text-xs text-gray-400 font-mono">{item.sku}</span>
+                          {item.sku && <span className="block text-xs text-gray-400 font-mono">{item.sku}</span>}
                         </td>
                         <td className="py-2.5 text-center text-gray-700">{item.quantity}</td>
-                        <td className="py-2.5 text-right text-gray-600">£{item.price.toFixed(2)}</td>
-                        <td className="py-2.5 text-right font-semibold text-gray-900">£{(item.price * item.quantity).toFixed(2)}</td>
+                        <td className="py-2.5 text-right text-gray-600">£{item.unitPrice.toFixed(2)}</td>
+                        <td className="py-2.5 text-right font-semibold text-gray-900">£{item.lineTotal.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -396,15 +453,15 @@ export default function PosPage() {
                 <div className="totals border-t-2 border-gray-200 pt-3 space-y-1">
                   <div className="row flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
-                    <span className="font-medium text-gray-900">£{completedSale.subtotal.toFixed(2)}</span>
+                    <span className="font-medium text-gray-900">£{invoiceData.subtotal.toFixed(2)}</span>
                   </div>
                   <div className="row flex justify-between text-sm">
                     <span className="text-gray-600">VAT (20%)</span>
-                    <span className="font-medium text-gray-900">£{completedSale.tax.toFixed(2)}</span>
+                    <span className="font-medium text-gray-900">£{invoiceData.tax.toFixed(2)}</span>
                   </div>
                   <div className="row grand flex justify-between text-xl font-bold pt-3 mt-2 border-t-2 border-gray-900">
                     <span>Total</span>
-                    <span className="amount text-green-600">£{completedSale.total.toFixed(2)}</span>
+                    <span className="amount text-green-600">£{invoiceData.total.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -591,7 +648,15 @@ export default function PosPage() {
                   <tbody>
                     {sales.map(sale => (
                       <tr key={sale.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-4 py-3 font-mono text-gray-900">{sale.saleNumber || sale.id.slice(0, 8)}</td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => viewSaleInvoice(sale)}
+                            className="font-mono text-blue-600 hover:text-blue-800 hover:underline"
+                            title="View Invoice"
+                          >
+                            {sale.saleNumber || sale.id.slice(0, 8)}
+                          </button>
+                        </td>
                         <td className="px-4 py-3 text-gray-600">{new Date(sale.createdAt).toLocaleString()}</td>
                         <td className="px-4 py-3 text-gray-900">{sale.customerName || '-'}</td>
                         <td className="px-4 py-3">
@@ -610,8 +675,15 @@ export default function PosPage() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button
-                              onClick={() => setSelectedSale(sale)}
+                              onClick={() => viewSaleInvoice(sale)}
                               className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                              title="View / Print Invoice"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => setSelectedSale(sale)}
+                              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
                               title="View details"
                             >
                               <Eye className="h-4 w-4" />
@@ -672,8 +744,8 @@ export default function PosPage() {
                 <div className="border-t border-gray-200 pt-3 space-y-2">
                   {(selectedSale.items || []).map((item: any, idx: number) => (
                     <div key={idx} className="flex justify-between text-sm">
-                      <span className="text-gray-700">{item.name || item.product?.name || 'Item'} x{item.quantity}</span>
-                      <span className="font-medium">£{((item.price || 0) * (item.quantity || 1)).toFixed(2)}</span>
+                      <span className="text-gray-700">{item.productName || item.name || item.product?.name || 'Item'} x{item.quantity}</span>
+                      <span className="font-medium">£{(item.lineTotal || (item.unitPrice || item.price || 0) * (item.quantity || 1)).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -681,6 +753,14 @@ export default function PosPage() {
                   <span>Total</span>
                   <span className="text-green-600">£{(selectedSale.total || 0).toFixed(2)}</span>
                 </div>
+                {/* View Invoice Button */}
+                <button
+                  onClick={() => viewSaleInvoice(selectedSale)}
+                  className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                >
+                  <Printer className="h-4 w-4" />
+                  View / Print Invoice
+                </button>
               </div>
             </div>
           </div>
