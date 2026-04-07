@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { useAuth } from '@/contexts/auth-context';
 import { apiClient } from '@/lib/api-client';
@@ -12,6 +12,9 @@ import {
   ToggleLeft,
   ToggleRight,
   Image as ImageIcon,
+  Upload,
+  X,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 const FEATURE_LABELS: Record<string, { label: string; description: string }> = {
@@ -36,6 +39,11 @@ export default function BrandingPage() {
   const [logo, setLogo] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#3b82f6');
   const [secondaryColor, setSecondaryColor] = useState('#10b981');
+
+  // Logo upload state
+  const [logoMode, setLogoMode] = useState<'url' | 'upload'>('upload');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Feature flags
   const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
@@ -103,6 +111,70 @@ export default function BrandingPage() {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please upload a PNG, JPG, SVG, or WebP image');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo must be under 5MB');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Step 1: Get presigned upload URL
+      const res = await fetch('/api/upload/presigned', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type,
+          isPublic: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to get upload URL');
+
+      const { uploadUrl, publicUrl } = data;
+
+      // Step 2: Upload file directly to S3
+      // Check if content-disposition is in signed headers
+      const urlObj = new URL(uploadUrl);
+      const signedHeaders = urlObj.searchParams.get('X-Amz-SignedHeaders') || '';
+      const headers: Record<string, string> = { 'Content-Type': file.type };
+      if (signedHeaders.includes('content-disposition')) {
+        headers['Content-Disposition'] = 'attachment';
+      }
+
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers,
+        body: file,
+      });
+
+      if (!uploadRes.ok) throw new Error('Failed to upload file to storage');
+
+      // Step 3: Set the public URL as the logo
+      setLogo(publicUrl);
+      toast.success('Logo uploaded successfully');
+    } catch (err: any) {
+      console.error('Logo upload error:', err);
+      toast.error(err.message || 'Failed to upload logo');
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   if (!isOwner) {
     return (
       <DashboardLayout>
@@ -151,21 +223,105 @@ export default function BrandingPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={logo}
-                  onChange={(e) => setLogo(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://i.pinimg.com/736x/d7/a8/95/d7a895c44c3fcdf6262e345b68ab22a3.jpg"
-                />
-                {logo && (
-                  <div className="w-10 h-10 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
-                    <img src={logo} alt="Logo preview" className="max-w-full max-h-full object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                  </div>
-                )}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company Logo</label>
+              {/* Mode toggle */}
+              <div className="flex gap-1 mb-2 bg-gray-100 rounded-lg p-0.5 w-fit">
+                <button
+                  type="button"
+                  onClick={() => setLogoMode('upload')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    logoMode === 'upload' ? 'bg-white text-gray-900 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Upload className="h-3.5 w-3.5" /> Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLogoMode('url')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    logoMode === 'url' ? 'bg-white text-gray-900 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <LinkIcon className="h-3.5 w-3.5" /> URL
+                </button>
               </div>
+
+              {logoMode === 'upload' ? (
+                <div className="space-y-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    id="logo-upload"
+                  />
+                  {/* Current logo preview or upload area */}
+                  {logo ? (
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="w-12 h-12 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden bg-white flex-shrink-0">
+                        <img src={logo} alt="Current logo" className="max-w-full max-h-full object-contain" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-700 truncate">Logo set</p>
+                        <p className="text-xs text-gray-400 truncate">{logo.length > 60 ? logo.slice(0, 60) + '...' : logo}</p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploading}
+                          className="px-3 py-1.5 text-xs bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors"
+                        >
+                          {isUploading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Replace'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLogo('')}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {isUploading ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                          <span className="text-sm text-blue-600">Uploading...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          <Upload className="h-6 w-6 text-gray-400" />
+                          <span className="text-sm text-gray-500">Click to upload logo</span>
+                          <span className="text-xs text-gray-400">PNG, JPG, SVG, WebP · Max 5MB</span>
+                        </div>
+                      )}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={logo}
+                    onChange={(e) => setLogo(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="https://placehold.co/1200x600/e2e8f0/1e293b?text=A_company_or_brand_logo_image__likely_a_small_icon"
+                  />
+                  {logo && (
+                    <div className="w-10 h-10 rounded border border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <img src={logo} alt="Logo preview" className="max-w-full max-h-full object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Primary Color</label>
