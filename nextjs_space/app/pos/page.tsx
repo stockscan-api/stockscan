@@ -84,19 +84,28 @@ export default function PosPage() {
   const [brandLogo, setBrandLogo] = useState('');
 
   useEffect(() => {
-    // Load company branding from user context + localStorage
-    const companyName = user?.company?.name || '';
-    setBrandName(companyName);
-    const cId = user?.companyId || user?.company?.id || '';
-    if (cId) {
+    // Fetch company profile from API (same as branding page) to get accurate name
+    const loadBranding = async () => {
       try {
-        const raw = localStorage.getItem(`stockscan_branding_${cId}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed.logo) setBrandLogo(parsed.logo);
+        const company = await apiClient.getCompanyProfile();
+        const cId = company?.id || '';
+        const cName = company?.name || '';
+        setBrandName(cName);
+        if (cId) {
+          try {
+            const raw = localStorage.getItem(`stockscan_branding_${cId}`);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed.logo) setBrandLogo(parsed.logo);
+            }
+          } catch {}
         }
-      } catch {}
-    }
+      } catch {
+        // Fallback to user context
+        setBrandName(user?.company?.name || '');
+      }
+    };
+    if (user) loadBranding();
   }, [user]);
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
