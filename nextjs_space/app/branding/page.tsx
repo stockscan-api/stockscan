@@ -37,6 +37,9 @@ export default function BrandingPage() {
   // Branding state
   const [companyId, setCompanyId] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [companyAddress, setCompanyAddress] = useState('');
+  const [companyPhone, setCompanyPhone] = useState('');
+  const [companyEmail, setCompanyEmail] = useState('');
   const [logo, setLogo] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#3b82f6');
   const [secondaryColor, setSecondaryColor] = useState('#10b981');
@@ -82,6 +85,9 @@ export default function BrandingPage() {
         const cId = c.id || '';
         setCompanyId(cId);
         setCompanyName(c.name || '');
+        setCompanyAddress(c.address || '');
+        setCompanyPhone(c.phone || '');
+        setCompanyEmail(c.email || '');
 
         // Load logo/colors/VAT from localStorage (not on backend)
         const local = loadLocalBranding(cId);
@@ -113,9 +119,9 @@ export default function BrandingPage() {
   const handleSaveBranding = async () => {
     setSaving(true);
     try {
-      // Save company name to backend
+      // Save company details to backend
       if (companyId) {
-        await apiClient.updateCompanyDetails(companyId, { name: companyName });
+        await apiClient.updateCompanyDetails(companyId, { name: companyName, address: companyAddress, phone: companyPhone, email: companyEmail });
       }
       // Save logo, colors & VAT to localStorage (backend doesn't support these yet)
       if (companyId) {
@@ -254,6 +260,37 @@ export default function BrandingPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Your Company Name"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telephone Number</label>
+              <input
+                type="tel"
+                value={companyPhone}
+                onChange={(e) => setCompanyPhone(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. 0121 123 4567"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <input
+                type="email"
+                value={companyEmail}
+                onChange={(e) => setCompanyEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="info@yourcompany.com"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Company Address</label>
+              <textarea
+                value={companyAddress}
+                onChange={(e) => setCompanyAddress(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                placeholder="Street address, City, Postcode"
+                rows={2}
+              />
+              <p className="text-xs text-gray-400 mt-1">This will appear on your invoices</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Company Logo</label>

@@ -82,18 +82,23 @@ export default function PosPage() {
   // Company branding & VAT
   const [brandName, setBrandName] = useState('');
   const [brandLogo, setBrandLogo] = useState('');
+  const [brandAddress, setBrandAddress] = useState('');
+  const [brandPhone, setBrandPhone] = useState('');
+  const [brandEmail, setBrandEmail] = useState('');
   const [vatRegistered, setVatRegistered] = useState(false);
   const [vatNumber, setVatNumber] = useState('');
   const [vatRatePercent, setVatRatePercent] = useState(20);
 
   useEffect(() => {
-    // Fetch company profile from API (same as branding page) to get accurate name
+    // Fetch company profile from API to get name, address, phone, email
     const loadBranding = async () => {
       try {
         const company = await apiClient.getCompanyProfile();
         const cId = company?.id || '';
-        const cName = company?.name || '';
-        setBrandName(cName);
+        setBrandName(company?.name || '');
+        setBrandAddress(company?.address || '');
+        setBrandPhone(company?.phone || '');
+        setBrandEmail(company?.email || '');
         if (cId) {
           try {
             const raw = localStorage.getItem(`stockscan_branding_${cId}`);
@@ -107,7 +112,6 @@ export default function PosPage() {
           } catch {}
         }
       } catch {
-        // Fallback to user context
         setBrandName(user?.company?.name || '');
       }
     };
@@ -352,7 +356,9 @@ export default function PosPage() {
       <div class="brand">
         ${brandLogo ? `<img src="${brandLogo}" alt="Logo" style="height:48px;max-width:180px;object-fit:contain;margin-bottom:6px;" />` : ''}
         <h1>${brandName || 'Invoice'}</h1>
-        <p>Inventory &amp; Sales Management</p>
+        ${brandAddress ? `<p style="white-space:pre-line;margin-top:4px;">${brandAddress.replace(/\n/g, '<br/>')}</p>` : ''}
+        ${brandPhone ? `<p>Tel: ${brandPhone}</p>` : ''}
+        ${brandEmail ? `<p>${brandEmail}</p>` : ''}
       </div>
       <div class="inv-title">
         <h2>Invoice</h2>
@@ -560,6 +566,14 @@ export default function PosPage() {
                     <img src={brandLogo} alt="Logo" className="h-12 max-w-[180px] object-contain mx-auto mb-2" />
                   )}
                   <h1 className="text-2xl font-bold text-gray-900">{brandName || 'Invoice'}</h1>
+                  {brandAddress && <p className="text-xs text-gray-500 mt-1 whitespace-pre-line">{brandAddress}</p>}
+                  {(brandPhone || brandEmail) && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {brandPhone && <>Tel: {brandPhone}</>}
+                      {brandPhone && brandEmail && <> · </>}
+                      {brandEmail && <>{brandEmail}</>}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500 mt-1">SALES INVOICE / RECEIPT</p>
                 </div>
 
