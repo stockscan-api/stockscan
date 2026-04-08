@@ -41,6 +41,11 @@ export default function BrandingPage() {
   const [primaryColor, setPrimaryColor] = useState('#3b82f6');
   const [secondaryColor, setSecondaryColor] = useState('#10b981');
 
+  // VAT state
+  const [vatRegistered, setVatRegistered] = useState(false);
+  const [vatNumber, setVatNumber] = useState('');
+  const [vatRate, setVatRate] = useState('20');
+
   // Logo upload state
   const [logoMode, setLogoMode] = useState<'url' | 'upload'>('upload');
   const [isUploading, setIsUploading] = useState(false);
@@ -59,7 +64,7 @@ export default function BrandingPage() {
     } catch {}
     return null;
   };
-  const saveLocalBranding = (cId: string, data: { logo: string; primaryColor: string; secondaryColor: string }) => {
+  const saveLocalBranding = (cId: string, data: { logo: string; primaryColor: string; secondaryColor: string; vatRegistered?: boolean; vatNumber?: string; vatRate?: string }) => {
     try {
       localStorage.setItem(getBrandingKey(cId), JSON.stringify(data));
     } catch {}
@@ -78,12 +83,15 @@ export default function BrandingPage() {
         setCompanyId(cId);
         setCompanyName(c.name || '');
 
-        // Load logo/colors from localStorage (not on backend)
+        // Load logo/colors/VAT from localStorage (not on backend)
         const local = loadLocalBranding(cId);
         if (local) {
           setLogo(local.logo || '');
           setPrimaryColor(local.primaryColor || '#3b82f6');
           setSecondaryColor(local.secondaryColor || '#10b981');
+          setVatRegistered(local.vatRegistered || false);
+          setVatNumber(local.vatNumber || '');
+          setVatRate(local.vatRate || '20');
         }
       }
       if (flags.status === 'fulfilled' && flags.value) {
@@ -109,9 +117,9 @@ export default function BrandingPage() {
       if (companyId) {
         await apiClient.updateCompanyDetails(companyId, { name: companyName });
       }
-      // Save logo & colors to localStorage (backend doesn't support these yet)
+      // Save logo, colors & VAT to localStorage (backend doesn't support these yet)
       if (companyId) {
-        saveLocalBranding(companyId, { logo, primaryColor, secondaryColor });
+        saveLocalBranding(companyId, { logo, primaryColor, secondaryColor, vatRegistered, vatNumber, vatRate });
       }
       toast.success('Branding updated successfully');
     } catch (err: any) {
@@ -400,6 +408,58 @@ export default function BrandingPage() {
             <div className="flex items-center gap-2 mt-3">
               <button className="px-4 py-1.5 text-white text-sm rounded-lg" style={{ backgroundColor: primaryColor }}>Primary Button</button>
               <button className="px-4 py-1.5 text-white text-sm rounded-lg" style={{ backgroundColor: secondaryColor }}>Secondary Button</button>
+            </div>
+          </div>
+
+          {/* VAT Settings */}
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <h3 className="text-base font-semibold text-gray-900 mb-4">VAT Settings</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">VAT Registered</p>
+                  <p className="text-sm text-gray-500">Enable this if your company is registered for VAT. VAT will be applied to all POS sales.</p>
+                </div>
+                <button
+                  onClick={() => setVatRegistered(!vatRegistered)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    vatRegistered ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    vatRegistered ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+              {vatRegistered && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-blue-200">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">VAT Number</label>
+                    <input
+                      type="text"
+                      value={vatNumber}
+                      onChange={(e) => setVatNumber(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g. GB123456789"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">This will appear on your invoices</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">VAT Rate (%)</label>
+                    <input
+                      type="number"
+                      value={vatRate}
+                      onChange={(e) => setVatRate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="20"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Standard UK VAT rate is 20%</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

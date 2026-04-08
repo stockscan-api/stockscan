@@ -79,9 +79,12 @@ export default function PosPage() {
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [customerName, setCustomerName] = useState('');
 
-  // Company branding
+  // Company branding & VAT
   const [brandName, setBrandName] = useState('');
   const [brandLogo, setBrandLogo] = useState('');
+  const [vatRegistered, setVatRegistered] = useState(false);
+  const [vatNumber, setVatNumber] = useState('');
+  const [vatRatePercent, setVatRatePercent] = useState(20);
 
   useEffect(() => {
     // Fetch company profile from API (same as branding page) to get accurate name
@@ -97,6 +100,9 @@ export default function PosPage() {
             if (raw) {
               const parsed = JSON.parse(raw);
               if (parsed.logo) setBrandLogo(parsed.logo);
+              setVatRegistered(parsed.vatRegistered || false);
+              setVatNumber(parsed.vatNumber || '');
+              setVatRatePercent(parseFloat(parsed.vatRate) || 20);
             }
           } catch {}
         }
@@ -206,7 +212,7 @@ export default function PosPage() {
   };
 
   const subtotal = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-  const tax = subtotal * 0.2; // 20% VAT
+  const tax = vatRegistered ? subtotal * (vatRatePercent / 100) : 0;
   const total = subtotal + tax;
 
   const handleCheckout = async () => {
@@ -390,19 +396,20 @@ export default function PosPage() {
     <div class="totals-wrapper">
       <div class="totals">
         <div class="row">
-          <span class="label">Subtotal (ex. VAT)</span>
+          <span class="label">Subtotal${vatRegistered ? ' (ex. VAT)' : ''}</span>
           <span class="amount">£${inv.subtotal.toFixed(2)}</span>
         </div>
-        <div class="row">
-          <span class="label">VAT @ 20%</span>
+        ${vatRegistered ? `<div class="row">
+          <span class="label">VAT @ ${vatRatePercent}%</span>
           <span class="amount">£${inv.tax.toFixed(2)}</span>
-        </div>
+        </div>` : ''}
         <div class="row grand">
           <span class="label">Total</span>
           <span class="amount">£${inv.total.toFixed(2)}</span>
         </div>
       </div>
     </div>
+    ${vatRegistered && vatNumber ? `<div style="margin-top:12px;text-align:right;font-size:12px;color:#6b7280;">VAT No: ${vatNumber}</div>` : ''}
     
     <div class="payment-info">
       <span class="method">Paid by ${inv.paymentMethod}</span>
@@ -610,18 +617,24 @@ export default function PosPage() {
                 {/* Totals */}
                 <div className="totals border-t-2 border-gray-200 pt-3 space-y-1">
                   <div className="row flex justify-between text-sm">
-                    <span className="text-gray-600">Subtotal</span>
+                    <span className="text-gray-600">Subtotal{vatRegistered ? ' (ex. VAT)' : ''}</span>
                     <span className="font-medium text-gray-900">£{invoiceData.subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="row flex justify-between text-sm">
-                    <span className="text-gray-600">VAT (20%)</span>
-                    <span className="font-medium text-gray-900">£{invoiceData.tax.toFixed(2)}</span>
-                  </div>
+                  {vatRegistered && (
+                    <div className="row flex justify-between text-sm">
+                      <span className="text-gray-600">VAT ({vatRatePercent}%)</span>
+                      <span className="font-medium text-gray-900">£{invoiceData.tax.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="row grand flex justify-between text-xl font-bold pt-3 mt-2 border-t-2 border-gray-900">
                     <span>Total</span>
                     <span className="amount text-green-600">£{invoiceData.total.toFixed(2)}</span>
                   </div>
                 </div>
+
+                {vatRegistered && vatNumber && (
+                  <p className="text-xs text-gray-400 text-right mt-2">VAT No: {vatNumber}</p>
+                )}
 
                 {/* Footer */}
                 <div className="footer text-center pt-4 mt-4 border-t border-dashed border-gray-300">
@@ -723,13 +736,15 @@ export default function PosPage() {
                 {/* Cart Summary */}
                 <div className="p-4 border-t border-gray-200 space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Subtotal</span>
+                    <span className="text-gray-600">Subtotal{vatRegistered ? ' (ex. VAT)' : ''}</span>
                     <span className="font-medium">£{subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">VAT (20%)</span>
-                    <span className="font-medium">£{tax.toFixed(2)}</span>
-                  </div>
+                  {vatRegistered && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">VAT ({vatRatePercent}%)</span>
+                      <span className="font-medium">£{tax.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
                     <span>Total</span>
                     <span className="text-green-600">£{total.toFixed(2)}</span>
