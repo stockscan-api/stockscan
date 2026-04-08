@@ -39,7 +39,8 @@ interface FormData {
   name: string;
   sku: string;
   description: string;
-  price: string;
+  costPrice: string;
+  unitPrice: string;
   currentStock: string;
   minimumStock: string;
   categoryId: string;
@@ -75,7 +76,8 @@ export default function ProductsPage() {
     name: '',
     sku: '',
     description: '',
-    price: '',
+    costPrice: '',
+    unitPrice: '',
     currentStock: '',
     minimumStock: '',
     categoryId: '',
@@ -134,7 +136,8 @@ export default function ProductsPage() {
         name: product?.name || '',
         sku: product?.sku || '',
         description: product?.description || '',
-        price: String(((product?.unitPrice ?? product?.price) || '')),
+        costPrice: product?.costPrice != null ? String(product.costPrice) : '',
+        unitPrice: String(((product?.unitPrice ?? product?.price) || '')),
         currentStock: String(product?.currentStock || ''),
         minimumStock: String(product?.minimumStock || ''),
         categoryId: product?.categoryId || '',
@@ -147,7 +150,8 @@ export default function ProductsPage() {
         name: '',
         sku: '',
         description: '',
-        price: '',
+        costPrice: '',
+        unitPrice: '',
         currentStock: '',
         minimumStock: '',
         categoryId: '',
@@ -163,11 +167,12 @@ export default function ProductsPage() {
     setIsSubmitting(true);
 
     try {
-      const payload = {
+      const payload: any = {
         name: formData.name,
         sku: formData.sku,
         description: formData.description || undefined,
-        price: parseFloat(formData.price) || 0,
+        unitPrice: parseFloat(formData.unitPrice) || 0,
+        costPrice: formData.costPrice ? parseFloat(formData.costPrice) : undefined,
         currentStock: parseInt(formData.currentStock) || 0,
         minimumStock: parseInt(formData.minimumStock) || 0,
         categoryId: formData.categoryId || undefined,
@@ -233,10 +238,19 @@ export default function ProductsPage() {
       ),
     },
     {
-      key: 'price',
-      header: 'Price',
+      key: 'costPrice',
+      header: 'Cost Price',
       render: (product: Product) => (
-        <span className="font-medium">{formatPrice(((product?.unitPrice ?? product?.price) || 0))}</span>
+        <span className="text-gray-600 text-sm">
+          {product?.costPrice != null ? formatPrice(product.costPrice) : <span className="text-gray-400">—</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'unitPrice',
+      header: 'Sell Price',
+      render: (product: Product) => (
+        <span className="font-medium text-green-700">{formatPrice(((product?.unitPrice ?? product?.price) || 0))}</span>
       ),
     },
     {
@@ -438,9 +452,18 @@ export default function ProductsPage() {
                           </div>
                           <h3 className="font-semibold text-gray-900 mb-1">{product?.name}</h3>
                           <p className="text-sm text-gray-500 mb-2">SKU: {product?.sku}</p>
-                          <p className="text-lg font-bold text-blue-600 mb-3">
-                            {formatPrice(((product?.unitPrice ?? product?.price) || 0))}
-                          </p>
+                          <div className="mb-3 space-y-0.5">
+                            <p className="text-lg font-bold text-green-700">
+                              {formatPrice(((product?.unitPrice ?? product?.price) || 0))}
+                              <span className="text-xs font-normal text-gray-400 ml-1">sell</span>
+                            </p>
+                            {product?.costPrice != null && (
+                              <p className="text-sm text-gray-500">
+                                {formatPrice(product.costPrice)}
+                                <span className="text-xs text-gray-400 ml-1">cost</span>
+                              </p>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             <Button variant="outline" size="sm" className="flex-1" onClick={() => handleOpenModal(product)}>
                               <Edit className="h-3 w-3 mr-1" />
@@ -494,13 +517,30 @@ export default function ProductsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Price ({currency.symbol}) *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cost Price ({currency.symbol})
+                <span className="text-xs font-normal text-gray-400 ml-1">— what you pay</span>
+              </label>
               <Input
                 type="number"
                 step="0.01"
                 min="0"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                value={formData.costPrice}
+                onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                placeholder="Optional"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sell Price ({currency.symbol}) *
+                <span className="text-xs font-normal text-gray-400 ml-1">— what customers pay</span>
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.unitPrice}
+                onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })}
                 required
               />
             </div>
