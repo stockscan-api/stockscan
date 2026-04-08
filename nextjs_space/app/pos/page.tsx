@@ -95,9 +95,11 @@ export default function PosPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (query?: string) => {
     try {
-      const res = await apiClient.getProducts({ limit: 100 });
+      const params: any = { limit: 50 };
+      if (query) params.search = query;
+      const res = await apiClient.getProducts(params);
       const list = res?.products || res?.items || res?.data || (Array.isArray(res) ? res : []);
       setProducts(Array.isArray(list) ? list : []);
     } catch (err) {
@@ -122,19 +124,27 @@ export default function PosPage() {
     }
   }, []);
 
+  // Load initial products
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  // Debounced server-side search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(true);
+      fetchProducts(searchQuery || undefined);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   useEffect(() => {
     if (view === 'history') fetchSales();
   }, [view, fetchSales]);
 
-  const filteredProducts = products.filter(p => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (p.name?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q));
-  });
+  // Products are now server-filtered, no client-side filter needed
+  const filteredProducts = products;
 
   const addToCart = (product: any) => {
     setCart(prev => {
