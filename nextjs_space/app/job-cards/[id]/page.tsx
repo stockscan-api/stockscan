@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { useAuth } from '@/contexts/auth-context';
@@ -160,6 +160,14 @@ export default function JobCardDetailPage() {
   const [showLabourModal, setShowLabourModal] = useState(false);
   const [editingLabour, setEditingLabour] = useState<LabourEntry | null>(null);
 
+  // Search state for stock item picker
+  const [stockSearch, setStockSearch] = useState('');
+  const [stockSearchResults, setStockSearchResults] = useState<StockItem[]>([]);
+  const [isSearchingStock, setIsSearchingStock] = useState(false);
+  const [showStockDropdown, setShowStockDropdown] = useState(false);
+  const [selectedStockLabel, setSelectedStockLabel] = useState('');
+  const stockSearchRef = useRef<HTMLDivElement>(null);
+
   // Allocate/Return form
   const [selectedStockItem, setSelectedStockItem] = useState('');
   const [allocateQty, setAllocateQty] = useState(1);
@@ -260,6 +268,44 @@ export default function JobCardDetailPage() {
     }
   }, []);
 
+  // Debounced stock search
+  const searchStockDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const handleStockSearchChange = useCallback((query: string) => {
+    setStockSearch(query);
+    setShowStockDropdown(true);
+    if (searchStockDebounceRef.current) clearTimeout(searchStockDebounceRef.current);
+    if (!query.trim()) {
+      // Show initial items from cache
+      setStockSearchResults(stockItems.filter(i => i.quantity > 0).slice(0, 20));
+      return;
+    }
+    searchStockDebounceRef.current = setTimeout(async () => {
+      setIsSearchingStock(true);
+      try {
+        const response = await apiClient.getStockItems({ search: query, limit: 30 });
+        const items = Array.isArray(response) ? response : (response?.products || response?.data || response?.stockItems || response?.items || []);
+        setStockSearchResults(items.filter((i: StockItem) => i.quantity > 0));
+      } catch {
+        // Fall back to client-side filter
+        const q = query.toLowerCase();
+        setStockSearchResults(stockItems.filter(i => i.quantity > 0 && (i.name?.toLowerCase().includes(q) || i.sku?.toLowerCase().includes(q))));
+      } finally {
+        setIsSearchingStock(false);
+      }
+    }, 300);
+  }, [stockItems]);
+
+  // Close stock dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (stockSearchRef.current && !stockSearchRef.current.contains(e.target as Node)) {
+        setShowStockDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     fetchJobCard();
     fetchStockItems();
@@ -288,6 +334,8 @@ export default function JobCardDetailPage() {
       toast.success('Stock allocated successfully');
       setShowAllocateModal(false);
       setSelectedStockItem('');
+      setSelectedStockLabel('');
+      setStockSearch('');
       setAllocateQty(1);
       fetchJobCard();
       fetchStockItems();
@@ -787,7 +835,7 @@ export default function JobCardDetailPage() {
                       {jobCard.status !== 'COMPLETED' && jobCard.status !== 'CANCELLED' && jobCard.status !== 'CLOSED' && (
                         <div className="flex gap-2">
                           <button
-                            onClick={() => setShowAllocateModal(true)}
+                            onClick={() => { setShowAllocateModal(true); setStockSearch(''); setSelectedStockItem(''); setSelectedStockLabel(''); setAllocateQty(1); setShowStockDropdown(false); }}
                             className="inline-flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
                           >
                             <Plus className="h-4 w-4" />
@@ -1071,21 +1119,72 @@ export default function JobCardDetailPage() {
                 </div>
               </div>
               <form onSubmit={handleAllocateStock} className="p-6 space-y-4">
-                <div>
+                <div ref={stockSearchRef} className="relative">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Stock Item *</label>
-                  <select
-                    value={selectedStockItem}
-                    onChange={(e) => setSelectedStockItem(e.target.value)}
+                  <input
+                    type="text"
+                    value={selectedStockItem ? selectedStockLabel : stockSearch}
+                    onChange={(e) => {
+                      if (selectedStockItem) {
+                        setSelectedStockItem('');
+                        setSelectedStockLabel('');
+                      }
+                      handleStockSearchChange(e.target.value);
+                    }}
+                    onFocus={() => {
+                      if (!selectedStockItem) {
+                        setShowStockDropdown(true);
+                        if (!stockSearch.trim()) {
+                          setStockSearchResults(stockItems.filter(i => i.quantity > 0).slice(0, 20));
+                        }
+                      }
+                    }}
+                    placeholder="Search by name or SKU..."
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  >
-                    <option value="">Select stock item</option>
-                    {stockItems.filter(item => item.quantity > 0).map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} (SKU: {item.sku}) - {item.quantity} available
-                      </option>
-                    ))}
-                  </select>
+                    autoComplete="off"
+                  />
+                  {selectedStockItem && (
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedStockItem(''); setSelectedStockLabel(''); setStockSearch(''); setShowStockDropdown(false); }}
+                      className="absolute right-2 top-8 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                  {isSearchingStock && (
+                    <div className="absolute right-2 top-8">
+                      <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                    </div>
+                  )}
+                  {showStockDropdown && !selectedStockItem && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {stockSearchResults.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-gray-500">
+                          {stockSearch.trim() ? 'No matching items found' : 'Type to search stock items'}
+                        </div>
+                      ) : (
+                        stockSearchResults.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedStockItem(item.id);
+                              setSelectedStockLabel(`${item.name} (SKU: ${item.sku})`);
+                              setStockSearch('');
+                              setShowStockDropdown(false);
+                            }}
+                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-0"
+                          >
+                            <p className="font-medium text-gray-900 text-sm">{item.name}</p>
+                            <p className="text-xs text-gray-500">SKU: {item.sku} · {item.quantity} available</p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                  {/* Hidden required input for form validation */}
+                  <input type="hidden" value={selectedStockItem} required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
