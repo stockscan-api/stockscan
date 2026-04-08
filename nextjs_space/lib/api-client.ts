@@ -797,24 +797,35 @@ class ApiClient {
 
   // ============ REPORTS ============
 
-  async getReportSales(params: { startDate: string; endDate: string; format?: string }) {
-    const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/api/reports/sales?${query}`);
+  // Inventory Reports
+  async getReportLowStock() {
+    return this.request<any>('/api/reports/inventory/low-stock');
   }
 
-  async getReportStock(params: { startDate: string; endDate: string; format?: string }) {
-    const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/api/reports/stock?${query}`);
+  async getReportValuation() {
+    return this.request<any>('/api/reports/inventory/valuation');
   }
 
-  async getReportJobCards(params: { startDate: string; endDate: string; format?: string }) {
-    const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/api/reports/job-cards?${query}`);
+  async getReportMovement(params: { startDate: string; endDate: string }) {
+    return this.request<any>('/api/reports/inventory/movement', { method: 'POST', body: JSON.stringify(params) });
   }
 
-  async getReportProfitLoss(params: { startDate: string; endDate: string; format?: string }) {
-    const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/api/reports/profit-loss?${query}`);
+  // Financial Reports
+  async getReportProfitLoss(params: { startDate: string; endDate: string }) {
+    return this.request<any>('/api/reports/financial/profit-loss', { method: 'POST', body: JSON.stringify(params) });
+  }
+
+  async getReportCategoryPerformance(params: { startDate: string; endDate: string }) {
+    return this.request<any>('/api/reports/financial/category-performance', { method: 'POST', body: JSON.stringify(params) });
+  }
+
+  // Product Reports
+  async getReportTopPerformers(params: { startDate: string; endDate: string }) {
+    return this.request<any>('/api/reports/products/top-performers', { method: 'POST', body: JSON.stringify(params) });
+  }
+
+  async getReportUnderperformers(params: { startDate: string; endDate: string }) {
+    return this.request<any>('/api/reports/products/underperformers', { method: 'POST', body: JSON.stringify(params) });
   }
 
   // ============ POS (Point of Sale) ============
@@ -846,8 +857,8 @@ class ApiClient {
     return this.request<any>('/api/feature-flags');
   }
 
-  async updateFeatureFlags(flags: Record<string, boolean>) {
-    return this.request<any>('/api/feature-flags', { method: 'PUT', body: JSON.stringify(flags) });
+  async updateFeatureFlags(data: { enabledFeatures: string[] }) {
+    return this.request<any>('/api/feature-flags', { method: 'PUT', body: JSON.stringify(data) });
   }
 
   // ============ COMPANY BRANDING ============

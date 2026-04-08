@@ -102,7 +102,14 @@ export default function BrandingPage() {
       }
       if (flags.status === 'fulfilled' && flags.value) {
         const f = flags.value;
-        setFeatureFlags(f.flags || f || {});
+        // Backend returns array of {feature, enabled, isCore, ...} objects
+        if (Array.isArray(f)) {
+          const map: Record<string, boolean> = {};
+          f.forEach((item: any) => { if (item.feature) map[item.feature] = !!item.enabled; });
+          setFeatureFlags(map);
+        } else {
+          setFeatureFlags(f.flags || f || {});
+        }
       }
     } catch (err) {
       console.error('Failed to load branding:', err);
@@ -140,7 +147,9 @@ export default function BrandingPage() {
     setFeatureFlags(updated);
     setSavingFlags(true);
     try {
-      await apiClient.updateFeatureFlags(updated);
+      // Backend expects { enabledFeatures: ["INVENTORY", "POS", ...] }
+      const enabledFeatures = Object.entries(updated).filter(([, v]) => v).map(([k]) => k);
+      await apiClient.updateFeatureFlags({ enabledFeatures });
       toast.success(`${FEATURE_LABELS[key]?.label || key} ${updated[key] ? 'enabled' : 'disabled'}`);
     } catch (err: any) {
       setFeatureFlags(featureFlags); // revert
