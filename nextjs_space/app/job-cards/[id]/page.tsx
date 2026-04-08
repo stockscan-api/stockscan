@@ -43,17 +43,21 @@ interface StockItem {
 
 interface StockAllocation {
   id: string;
-  stockItemId: string;
+  stockItemId?: string;
+  productId?: string;
   stockItem?: StockItem;
   product?: { id: string; name: string; sku: string; barcode?: string };
-  quantity: number;
+  quantity?: number;
   quantityAllocated?: number;
   quantityReturned?: number;
   quantityOnJob?: number;
   unitCost?: string;
+  unitCostAtAllocation?: string;
   totalCost?: string;
   allocatedBy?: string;
-  createdAt: string;
+  allocatedById?: string;
+  allocatedAt?: string;
+  createdAt?: string;
 }
 
 interface LabourEntry {
@@ -356,7 +360,7 @@ export default function JobCardDetailPage() {
     try {
       setUpdating(true);
       await apiClient.returnStockFromJob(jobCardId, {
-        stockItemId: selectedAllocation.stockItemId,
+        stockItemId: selectedAllocation.stockItemId || selectedAllocation.productId || selectedAllocation.product?.id || '',
         quantity: returnQty
       });
       toast.success('Stock returned successfully');
@@ -861,18 +865,27 @@ export default function JobCardDetailPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {allocations.map((alloc) => (
-                          <div key={alloc.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                            <div>
-                              <p className="font-medium text-gray-900">{alloc.stockItem?.name || 'Unknown Item'}</p>
-                              <p className="text-sm text-gray-500">SKU: {alloc.stockItem?.sku || 'N/A'}</p>
+                        {allocations.map((alloc, idx) => {
+                          const name = alloc.product?.name || alloc.stockItem?.name || 'Unknown Item';
+                          const sku = alloc.product?.sku || alloc.stockItem?.sku || 'N/A';
+                          const qty = alloc.quantityAllocated ?? alloc.quantityOnJob ?? alloc.quantity ?? 0;
+                          const returned = alloc.quantityReturned ?? 0;
+                          const cost = alloc.unitCostAtAllocation || alloc.unitCost || alloc.totalCost;
+                          const dateStr = alloc.allocatedAt || alloc.createdAt;
+                          return (
+                            <div key={alloc.id || idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="font-medium text-gray-900">{name}</p>
+                                <p className="text-sm text-gray-500">SKU: {sku}</p>
+                                {cost && <p className="text-xs text-gray-400">Unit cost: £{cost}</p>}
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-gray-900">Qty: {qty}{returned > 0 ? ` (${returned} returned)` : ''}</p>
+                                {dateStr && <p className="text-sm text-gray-500">{new Date(dateStr).toLocaleDateString()}</p>}
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="font-semibold text-gray-900">Qty: {alloc.quantity}</p>
-                              <p className="text-sm text-gray-500">{new Date(alloc.createdAt).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </>
@@ -1239,17 +1252,24 @@ export default function JobCardDetailPage() {
                     onChange={(e) => {
                       const alloc = allocations.find(a => a.id === e.target.value);
                       setSelectedAllocation(alloc || null);
-                      if (alloc) setReturnQty(Math.min(returnQty, alloc.quantity));
+                      if (alloc) {
+                        const onJob = (alloc.quantityAllocated ?? alloc.quantityOnJob ?? alloc.quantity ?? 0) - (alloc.quantityReturned ?? 0);
+                        setReturnQty(Math.min(returnQty, onJob));
+                      }
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   >
                     <option value="">Select allocation</option>
-                    {allocations.map((alloc) => (
-                      <option key={alloc.id} value={alloc.id}>
-                        {alloc.stockItem?.name || 'Unknown'} - Qty: {alloc.quantity}
-                      </option>
-                    ))}
+                    {allocations.map((alloc) => {
+                      const aName = alloc.product?.name || alloc.stockItem?.name || 'Unknown';
+                      const onJob = (alloc.quantityAllocated ?? alloc.quantityOnJob ?? alloc.quantity ?? 0) - (alloc.quantityReturned ?? 0);
+                      return (
+                        <option key={alloc.id} value={alloc.id}>
+                          {aName} - Qty on job: {onJob}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
                 <div>
@@ -1257,14 +1277,14 @@ export default function JobCardDetailPage() {
                   <input
                     type="number"
                     min="1"
-                    max={selectedAllocation?.quantity || 1}
+                    max={selectedAllocation ? ((selectedAllocation.quantityAllocated ?? selectedAllocation.quantityOnJob ?? selectedAllocation.quantity ?? 0) - (selectedAllocation.quantityReturned ?? 0)) : 1}
                     value={returnQty}
                     onChange={(e) => setReturnQty(parseInt(e.target.value) || 1)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                   {selectedAllocation && (
-                    <p className="text-sm text-gray-500 mt-1">Max: {selectedAllocation.quantity}</p>
+                    <p className="text-sm text-gray-500 mt-1">Max: {(selectedAllocation.quantityAllocated ?? selectedAllocation.quantityOnJob ?? selectedAllocation.quantity ?? 0) - (selectedAllocation.quantityReturned ?? 0)}</p>
                   )}
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
