@@ -503,12 +503,17 @@ class ApiClient {
     });
   }
 
-  // Allocate stock to job card
+  // Allocate stock to job card — backend expects { productId, quantityAllocated } at /allocations
   async allocateStockToJob(jobCardId: string, data: { stockItemId: string; quantity: number }) {
-    return this.request<any>(`/api/job-cards/${jobCardId}/allocate-stock`, {
+    return this.request<any>(`/api/job-cards/${jobCardId}/allocations`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ productId: data.stockItemId, quantityAllocated: data.quantity }),
     });
+  }
+
+  // Get job card allocations
+  async getJobCardAllocations(jobCardId: string) {
+    return this.request<any>(`/api/job-cards/${jobCardId}/allocations`);
   }
 
   // Return stock from job card
