@@ -795,26 +795,206 @@ class ApiClient {
     return this.request<any>(`/api/job-cards/${jobCardId}/export-sage`);
   }
 
-  // ============ REPORTS ============
+  // ============ REPORTS (client-side aggregation) ============
 
   async getReportSales(params: { startDate: string; endDate: string; format?: string }) {
-    const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/api/reports/sales?${query}`);
+    // Fetch all POS sales and aggregate client-side
+    const res = await this.getPosSales({ limit: 1000 });
+    const allSales = res?.sales || res?.data || (Array.isArray(res) ? res : []);
+    const start = new Date(params.startDate);
+    const end = new Date(params.endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const filtered = allSales.filter((s: any) => {
+      const d = new Date(s.createdAt);
+      return d >= start && d <= end;
+    });
+
+    const totalSales = filtered.reduce((sum: number, s: any) => sum + (s.total ?? s.totalAmount ?? 0), 0);
+    const salesCount = filtered.length;
+
+    // Sales by date
+    const byDateMap: Record<string, number> = {};
+    filtered.forEach((s: any) => {
+      const day = new Date(s.createdAt).toISOString().split('T')[0];
+      byDateMap[day] = (byDateMap[day] || 0) + (s.total ?? s.totalAmount ?? 0);
+    });
+    const salesByDate = Object.entries(byDateMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, total]) => ({ date, total }));
+
+    // Top products
+    const prodMap: Record<string, { name: string; quantity: number; revenue: number }> = {};
+    filtered.forEach((s: any) => {
+      const items = s.items || s.saleItems || [];
+      items.forEach((item: any) => {
+        const name = item.productName || item.name || 'Unknown';
+        const key = item.productId || name;
+        if (!prodMap[key]) prodMap[key] = { name, quantity: 0, revenue: 0 };
+        prodMap[key].quantity += item.quantity || 0;
+        prodMap[key].revenue += (item.quantity || 0) * (item.unitPrice || item.price || 0);
+      });
+    });
+    const topProducts = Object.values(prodMap).sort((a, b) => b.quantity - a.quantity);
+
+    // Sales by payment method
+    const methodMap: Record<string, number> = {};
+    filtered.forEach((s: any) => {
+      const m = s.paymentMethod || 'Unknown';
+      methodMap[m] = (methodMap[m] || 0) + (s.total ?? s.totalAmount ?? 0);
+    });
+    const salesByPaymentMethod = Object.entries(methodMap).map(([method, total]) => ({ method, total }));
+
+    if (params.format === 'csv') {
+      const rows = [['Date', 'Sale #', 'Customer', 'Payment', 'Total']];
+      filtered.forEach((s: any) => {
+        rows.push([
+          new Date(s.createdAt).toLocaleDateString('en-GB'),
+          s.saleNumber || s.receiptNumber || s.id?.slice(0, 8) || '',
+          s.customerName || '',
+          s.paymentMethod || '',
+          (s.total ?? s.totalAmount ?? 0).toFixed(2),
+        ]);
+      });
+      return rows.map(r => r.join(',')).join('\n');
+    }
+
+    return { totalSales, salesCount, salesByDate, topProducts, salesByPaymentMethod };
   }
 
   async getReportStock(params: { startDate: string; endDate: string; format?: string }) {
-    const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/api/reports/stock?${query}`);
+    // Fetch all products for stock report
+    const res = await this.getProducts({ limit: 1000 });
+    const products = res?.products || res?.data || (Array.isArray(res) ? res : []);
+
+    const items = products.map((p: any) => ({
+      name: p.name,
+      sku: p.sku || '',
+      quantity: p.quantity ?? p.currentStock ?? 0,
+      reorderPoint: p.reorderThreshold ?? p.reorderPoint ?? p.minimumStock ?? 0,
+      costPrice: p.costPrice ?? 0,
+      unitPrice: p.unitPrice ?? p.price ?? 0,
+      isLowStock: (p.quantity ?? p.currentStock ?? 0) <= (p.reorderThreshold ?? p.reorderPoint ?? 0),
+    }));
+
+    const totalValue = items.reduce((sum: number, i: any) => sum + (i.quantity * i.costPrice), 0);
+    const lowStockCount = items.filter((i: any) => i.isLowStock).length;
+
+    if (params.format === 'csv') {
+      const rows = [['Product', 'SKU', 'In Stock', 'Reorder Point', 'Cost Price', 'Value']];
+      items.forEach((i: any) => {
+        rows.push([i.name, i.sku, i.quantity, i.reorderPoint, i.costPrice.toFixed(2), (i.quantity * i.costPrice).toFixed(2)]);
+      });
+      return rows.map(r => r.join(',')).join('\n');
+    }
+
+    return { items, totalValue, lowStockCount, totalItems: items.length };
   }
 
   async getReportJobCards(params: { startDate: string; endDate: string; format?: string }) {
-    const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/api/reports/job-cards?${query}`);
+    const res = await this.getJobCards({ limit: 1000 });
+    const allJobs = res?.jobCards || res?.data || (Array.isArray(res) ? res : []);
+    const start = new Date(params.startDate);
+    const end = new Date(params.endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const filtered = allJobs.filter((j: any) => {
+      const d = new Date(j.createdAt);
+      return d >= start && d <= end;
+    });
+
+    const totalJobs = filtered.length;
+    const totalMaterials = filtered.reduce((sum: number, j: any) => sum + (j.materialsCost ?? 0), 0);
+    const totalLabour = filtered.reduce((sum: number, j: any) => sum + (j.labourCost ?? 0), 0);
+    const totalCost = totalMaterials + totalLabour;
+    const avgValue = totalJobs > 0 ? totalCost / totalJobs : 0;
+
+    // By status
+    const statusMap: Record<string, number> = {};
+    filtered.forEach((j: any) => {
+      const s = j.status || 'UNKNOWN';
+      statusMap[s] = (statusMap[s] || 0) + 1;
+    });
+    const byStatus = Object.entries(statusMap).map(([status, count]) => ({ status, count }));
+
+    if (params.format === 'csv') {
+      const rows = [['Job Ref', 'Status', 'Customer', 'Materials', 'Labour', 'Total', 'Created']];
+      filtered.forEach((j: any) => {
+        rows.push([
+          j.jobReference || j.id?.slice(0, 8) || '',
+          j.status || '',
+          j.customerName || '',
+          (j.materialsCost ?? 0).toFixed(2),
+          (j.labourCost ?? 0).toFixed(2),
+          ((j.materialsCost ?? 0) + (j.labourCost ?? 0)).toFixed(2),
+          new Date(j.createdAt).toLocaleDateString('en-GB'),
+        ]);
+      });
+      return rows.map(r => r.join(',')).join('\n');
+    }
+
+    return { totalJobs, averageJobValue: avgValue, totalMaterialsCost: totalMaterials, totalLabourCost: totalLabour, byStatus };
   }
 
   async getReportProfitLoss(params: { startDate: string; endDate: string; format?: string }) {
-    const query = new URLSearchParams(params as any).toString();
-    return this.request<any>(`/api/reports/profit-loss?${query}`);
+    // Combine sales revenue with product cost data
+    const [salesRes, productsRes] = await Promise.all([
+      this.getPosSales({ limit: 1000 }),
+      this.getProducts({ limit: 1000 }),
+    ]);
+
+    const allSales = salesRes?.sales || salesRes?.data || (Array.isArray(salesRes) ? salesRes : []);
+    const products = productsRes?.products || productsRes?.data || (Array.isArray(productsRes) ? productsRes : []);
+    const start = new Date(params.startDate);
+    const end = new Date(params.endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const filtered = allSales.filter((s: any) => {
+      const d = new Date(s.createdAt);
+      return d >= start && d <= end;
+    });
+
+    // Build product cost lookup
+    const costLookup: Record<string, number> = {};
+    products.forEach((p: any) => {
+      costLookup[p.id] = p.costPrice ?? 0;
+    });
+
+    let revenue = 0;
+    let costs = 0;
+    const monthlyMap: Record<string, { revenue: number; costs: number }> = {};
+
+    filtered.forEach((s: any) => {
+      const saleTotal = s.total ?? s.totalAmount ?? 0;
+      revenue += saleTotal;
+      const monthKey = new Date(s.createdAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+      if (!monthlyMap[monthKey]) monthlyMap[monthKey] = { revenue: 0, costs: 0 };
+      monthlyMap[monthKey].revenue += saleTotal;
+
+      const items = s.items || s.saleItems || [];
+      items.forEach((item: any) => {
+        const costPrice = costLookup[item.productId] ?? 0;
+        const itemCost = costPrice * (item.quantity || 0);
+        costs += itemCost;
+        monthlyMap[monthKey].costs += itemCost;
+      });
+    });
+
+    const grossProfit = revenue - costs;
+    const grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+    const breakdown = Object.entries(monthlyMap).map(([month, data]) => ({ month, ...data }));
+
+    if (params.format === 'csv') {
+      const rows = [['Month', 'Revenue', 'Costs', 'Profit']];
+      breakdown.forEach((b) => {
+        rows.push([b.month, b.revenue.toFixed(2), b.costs.toFixed(2), (b.revenue - b.costs).toFixed(2)]);
+      });
+      rows.push(['', '', '', '']);
+      rows.push(['Total', revenue.toFixed(2), costs.toFixed(2), grossProfit.toFixed(2)]);
+      return rows.map(r => r.join(',')).join('\n');
+    }
+
+    return { revenue, costs, grossProfit, grossMargin, netProfit: grossProfit, breakdown };
   }
 
   // ============ POS (Point of Sale) ============
