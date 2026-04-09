@@ -74,12 +74,17 @@ interface LabourEntry {
 
 interface ActivityEntry {
   id: string;
-  action: string;
-  details: string;
+  action?: string;
+  activityType?: string;
+  details?: string;
+  description?: string;
   performedByUser?: { id: string; name: string };
+  user?: { id: string; name: string; email?: string };
   performedByUserId?: string;
-  performedAt: string;
-  createdAt: string;
+  userId?: string;
+  performedAt?: string;
+  createdAt?: string;
+  metadata?: string;
 }
 
 interface JobCard {
@@ -982,27 +987,35 @@ export default function JobCardDetailPage() {
                       <div className="relative">
                         <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200" />
                         <div className="space-y-4">
-                          {activityLog.map((entry, idx) => (
-                            <div key={idx} className="relative pl-10">
-                              <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow" />
-                              <div className="bg-gray-50 rounded-lg p-3">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div>
-                                    <p className="font-medium text-gray-900 text-sm">{entry.action}</p>
-                                    {entry.details && (
-                                      <p className="text-sm text-gray-600 mt-0.5">{entry.details}</p>
+                          {activityLog.map((entry, idx) => {
+                            const actionLabel = entry.activityType || entry.action || 'Activity';
+                            const actionFormatted = actionLabel.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                            const detail = entry.description || entry.details || '';
+                            const performer = entry.user || entry.performedByUser;
+                            const performerName = performer ? (typeof performer === 'object' ? performer.name : performer) : null;
+                            const dateStr = entry.createdAt || entry.performedAt;
+                            return (
+                              <div key={entry.id || idx} className="relative pl-10">
+                                <div className="absolute left-2.5 top-1.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow" />
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="font-medium text-gray-900 text-sm">{actionFormatted}</p>
+                                      {detail && (
+                                        <p className="text-sm text-gray-600 mt-0.5">{detail}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                                    {performerName && (
+                                      <span>by {performerName}</span>
                                     )}
+                                    {dateStr && <span>{new Date(dateStr).toLocaleString()}</span>}
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                                  {entry.performedByUser && (
-                                    <span>by {typeof entry.performedByUser === 'object' ? (entry.performedByUser as any).name : entry.performedByUser}</span>
-                                  )}
-                                  <span>{new Date(entry.performedAt).toLocaleString()}</span>
-                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
