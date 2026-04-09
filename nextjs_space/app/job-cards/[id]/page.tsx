@@ -208,6 +208,16 @@ export default function JobCardDetailPage() {
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
   const [exportingSage, setExportingSage] = useState(false);
 
+  // Branding (for invoice)
+  const [brandName, setBrandName] = useState('');
+  const [brandLogo, setBrandLogo] = useState('');
+  const [brandAddress, setBrandAddress] = useState('');
+  const [brandPhone, setBrandPhone] = useState('');
+  const [brandEmail, setBrandEmail] = useState('');
+  const [vatRegistered, setVatRegistered] = useState(false);
+  const [vatNumber, setVatNumber] = useState('');
+  const [vatRatePercent, setVatRatePercent] = useState(20);
+
   // Edit form
   const [editForm, setEditForm] = useState({
     title: '',
@@ -320,6 +330,33 @@ export default function JobCardDetailPage() {
     fetchStockItems();
     fetchUsers();
   }, [fetchJobCard, fetchStockItems, fetchUsers]);
+
+  // Load branding for invoices
+  useEffect(() => {
+    const loadBranding = async () => {
+      try {
+        const company = await apiClient.getCompanyProfile();
+        const cId = company?.id || '';
+        setBrandName(company?.name || '');
+        setBrandAddress(company?.address || '');
+        setBrandPhone(company?.phone || '');
+        setBrandEmail(company?.email || '');
+        if (cId) {
+          try {
+            const raw = localStorage.getItem(`stockscan_branding_${cId}`);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed.logo) setBrandLogo(parsed.logo);
+              setVatRegistered(parsed.vatRegistered || false);
+              setVatNumber(parsed.vatNumber || '');
+              setVatRatePercent(parseFloat(parsed.vatRate) || 20);
+            }
+          } catch {}
+        }
+      } catch {}
+    };
+    if (user) loadBranding();
+  }, [user]);
 
   useEffect(() => {
     if (activeTab === 'activity') {
@@ -453,53 +490,177 @@ export default function JobCardDetailPage() {
     try {
       setGeneratingInvoice(true);
       const invoice = await apiClient.getJobCardInvoice(jobCardId);
-      // If invoice returns content for display/download
-      if (invoice?.content || invoice?.html) {
-        const content = invoice.content || invoice.html;
-        const blob = new Blob([content], { type: 'text/html' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${jobCard?.jobReference || 'invoice'}_invoice.html`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      } else if (invoice?.url) {
-        window.open(invoice.url, '_blank');
-      } else {
-        // Display invoice data in a new window
-        const invoiceWindow = window.open('', '_blank');
-        if (invoiceWindow) {
-          const ref = invoice?.jobReference || jobCard?.jobReference || '';
-          const cust = invoice?.customer || jobCard?.customerName || jobCard?.customer || '';
-          const items = invoice?.items || [];
-          const labour = invoice?.labour || [];
-          invoiceWindow.document.write(`
-            <html><head><title>Invoice - ${ref}</title>
-            <style>body{font-family:Arial,sans-serif;max-width:800px;margin:auto;padding:20px}
-            table{width:100%;border-collapse:collapse;margin:15px 0}
-            th,td{border:1px solid #ddd;padding:8px;text-align:left}
-            th{background:#f5f5f5}
-            .total{font-weight:bold;font-size:1.2em}
-            @media print{button{display:none}}</style></head><body>
-            <h1>Invoice: ${ref}</h1>
-            <p><strong>Customer:</strong> ${cust}</p>
-            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-            <h3>Materials</h3>
-            <table><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
-            ${items.map((i: any) => `<tr><td>${i.description || i.name || ''}</td><td>${i.quantity || ''}</td><td>£${parseFloat(i.unitPrice || 0).toFixed(2)}</td><td>£${parseFloat(i.total || i.lineTotal || 0).toFixed(2)}</td></tr>`).join('')}
-            </table>
-            <h3>Labour</h3>
-            <table><tr><th>Description</th><th>Hours</th><th>Rate</th><th>Total</th></tr>
-            ${labour.map((l: any) => `<tr><td>${l.description || ''}</td><td>${l.hours || l.hoursWorked || ''}</td><td>£${parseFloat(l.rate || l.hourlyRate || 0).toFixed(2)}</td><td>£${parseFloat(l.total || l.labourCost || 0).toFixed(2)}</td></tr>`).join('')}
-            </table>
-            <hr/>
-            <p>Subtotal: £${parseFloat(invoice?.subtotal || invoice?.totalCost || '0').toFixed(2)}</p>
-            ${invoice?.tax ? `<p>VAT: £${parseFloat(invoice.tax).toFixed(2)}</p>` : ''}
-            <p class="total">Total: £${parseFloat(invoice?.total || invoice?.totalCost || '0').toFixed(2)}</p>
-            <br/><button onclick="window.print()">Print Invoice</button>
-            </body></html>
-          `);
-        }
+
+      const ref = invoice?.jobCard?.jobReference || jobCard?.jobReference || '';
+      const jobTitle = invoice?.jobCard?.jobName || jobCard?.jobName || jobCard?.title || '';
+      const cust = invoice?.jobCard?.customerName || jobCard?.customerName || '';
+      const compName = invoice?.company?.name || brandName || '';
+      const stockItems = invoice?.lineItems?.stock || [];
+      const labourItems = invoice?.lineItems?.labour || [];
+      const summary = invoice?.summary || {};
+      const matCost = parseFloat(summary.materialsCost || '0');
+      const labCost = parseFloat(summary.labourCost || '0');
+      const subtotal = parseFloat(summary.subtotal || String(matCost + labCost));
+      const backendVat = parseFloat(summary.vat || '0');
+      // Use local VAT settings if available, else backend
+      const vatAmount = vatRegistered ? subtotal * (vatRatePercent / 100) : backendVat;
+      const total = parseFloat(summary.total || String(subtotal + vatAmount));
+      const invoiceDate = invoice?.createdAt ? new Date(invoice.createdAt) : new Date();
+      const dateStr = invoiceDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+      const stockRows = stockItems.map((i: any) => `
+        <tr>
+          <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb;">
+            ${i.description || i.name || ''}
+            ${i.sku ? `<br><span style="font-size:11px;color:#9ca3af;font-family:monospace;">${i.sku}</span>` : ''}
+          </td>
+          <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:center;">${i.quantity || ''}</td>
+          <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:right;">£${parseFloat(i.unitPrice || '0').toFixed(2)}</td>
+          <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:right; font-weight:600;">£${parseFloat(i.lineTotal || '0').toFixed(2)}</td>
+        </tr>
+      `).join('');
+
+      const labourRows = labourItems.map((l: any) => `
+        <tr>
+          <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb;">${l.description || l.staffName || ''}</td>
+          <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:center;">${parseFloat(l.hours || '0').toFixed(1)}h</td>
+          <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:right;">£${parseFloat(l.rate || '0').toFixed(2)}/h</td>
+          <td style="padding:10px 8px; border-bottom:1px solid #e5e7eb; text-align:right; font-weight:600;">£${parseFloat(l.lineTotal || '0').toFixed(2)}</td>
+        </tr>
+      `).join('');
+
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Job Card Invoice - ${ref}</title>
+  <style>
+    @page { size: A4; margin: 20mm 15mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Helvetica, Arial, sans-serif; color: #1a1a1a; font-size: 14px; line-height: 1.5; }
+    .page { max-width: 210mm; margin: 0 auto; padding: 40px; }
+    .inv-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 3px solid #1e3a5f; }
+    .inv-header .brand h1 { font-size: 28px; font-weight: 800; color: #1e3a5f; letter-spacing: -0.5px; }
+    .inv-header .brand p { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    .inv-header .inv-title { text-align: right; }
+    .inv-header .inv-title h2 { font-size: 24px; font-weight: 700; color: #1e3a5f; text-transform: uppercase; letter-spacing: 2px; }
+    .inv-header .inv-title .inv-num { font-size: 16px; color: #374151; font-family: monospace; margin-top: 4px; }
+    .inv-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 36px; }
+    .meta-block { background: #f9fafb; border-radius: 8px; padding: 16px 20px; }
+    .meta-block .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; font-weight: 600; margin-bottom: 4px; }
+    .meta-block .value { font-size: 15px; font-weight: 600; color: #111827; }
+    .section-title { font-size: 16px; font-weight: 700; color: #1e3a5f; margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #e5e7eb; }
+    .items-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    .items-table thead th { background: #1e3a5f; color: #ffffff; padding: 12px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; text-align: left; }
+    .items-table thead th:nth-child(2) { text-align: center; }
+    .items-table thead th:nth-child(3), .items-table thead th:nth-child(4) { text-align: right; }
+    .items-table tbody td { font-size: 14px; }
+    .items-table tbody tr:nth-child(even) { background: #f9fafb; }
+    .totals-wrapper { display: flex; justify-content: flex-end; margin-top: 24px; }
+    .totals { width: 300px; }
+    .totals .row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+    .totals .row .label { color: #6b7280; }
+    .totals .row .amount { font-weight: 600; color: #111827; }
+    .totals .row.grand { font-size: 20px; font-weight: 800; padding-top: 14px; margin-top: 10px; border-top: 3px solid #1e3a5f; }
+    .totals .row.grand .amount { color: #059669; }
+    .inv-footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #9ca3af; font-size: 12px; }
+    .inv-footer p { margin-bottom: 4px; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .page { padding: 0; max-width: none; }
+      button { display: none !important; }
+    }
+    @media screen {
+      body { background: #e5e7eb; padding: 20px; }
+      .page { background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border-radius: 4px; min-height: 297mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="inv-header">
+      <div class="brand">
+        ${brandLogo ? `<img src="${brandLogo}" alt="Logo" style="height:48px;max-width:180px;object-fit:contain;margin-bottom:6px;" />` : ''}
+        <h1>${compName || 'Invoice'}</h1>
+        ${brandAddress ? `<p style="white-space:pre-line;margin-top:4px;">${brandAddress.replace(/\n/g, '<br/>')}</p>` : ''}
+        ${brandPhone ? `<p>Tel: ${brandPhone}</p>` : ''}
+        ${brandEmail ? `<p>${brandEmail}</p>` : ''}
+      </div>
+      <div class="inv-title">
+        <h2>Job Invoice</h2>
+        <div class="inv-num">${ref}</div>
+      </div>
+    </div>
+
+    <div class="inv-meta">
+      <div class="meta-block">
+        <div class="label">Date</div>
+        <div class="value">${dateStr}</div>
+      </div>
+      <div class="meta-block">
+        <div class="label">Customer</div>
+        <div class="value">${cust || '—'}</div>
+      </div>
+      <div class="meta-block">
+        <div class="label">Job</div>
+        <div class="value">${jobTitle || '—'}</div>
+      </div>
+      <div class="meta-block">
+        <div class="label">Status</div>
+        <div class="value">${invoice?.jobCard?.status || jobCard?.status || ''}</div>
+      </div>
+    </div>
+
+    ${stockItems.length > 0 ? `
+    <div class="section-title">Materials / Parts</div>
+    <table class="items-table">
+      <thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead>
+      <tbody>${stockRows}</tbody>
+    </table>` : ''}
+
+    ${labourItems.length > 0 ? `
+    <div class="section-title">Labour</div>
+    <table class="items-table">
+      <thead><tr><th>Description</th><th>Hours</th><th>Rate</th><th>Amount</th></tr></thead>
+      <tbody>${labourRows}</tbody>
+    </table>` : ''}
+
+    <div class="totals-wrapper">
+      <div class="totals">
+        <div class="row">
+          <span class="label">Materials</span>
+          <span class="amount">£${matCost.toFixed(2)}</span>
+        </div>
+        <div class="row">
+          <span class="label">Labour</span>
+          <span class="amount">£${labCost.toFixed(2)}</span>
+        </div>
+        <div class="row" style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:6px;">
+          <span class="label">Subtotal${vatRegistered || backendVat > 0 ? ' (ex. VAT)' : ''}</span>
+          <span class="amount">£${subtotal.toFixed(2)}</span>
+        </div>
+        ${(vatRegistered || backendVat > 0) ? `<div class="row">
+          <span class="label">VAT${vatRegistered ? ` @ ${vatRatePercent}%` : ''}</span>
+          <span class="amount">£${vatAmount.toFixed(2)}</span>
+        </div>` : ''}
+        <div class="row grand">
+          <span class="label">Total</span>
+          <span class="amount">£${total.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+    ${(vatRegistered || backendVat > 0) && vatNumber ? `<div style="margin-top:12px;text-align:right;font-size:12px;color:#6b7280;">VAT No: ${vatNumber}</div>` : ''}
+
+    <div class="inv-footer">
+      <p>Thank you for your business!</p>
+      <p>Generated by ${compName || 'StockScan'} · ${dateStr}</p>
+    </div>
+  </div>
+  <script>setTimeout(function() { window.print(); }, 400);<\/script>
+</body>
+</html>`);
+        w.document.close();
       }
       toast.success('Invoice generated');
     } catch (error: any) {
