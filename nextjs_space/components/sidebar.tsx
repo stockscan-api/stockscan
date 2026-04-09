@@ -24,6 +24,7 @@ import {
   BarChart3,
   ShoppingCart,
   Palette,
+  FileText,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -37,6 +38,7 @@ const navItems = [
   { href: '/job-cards', label: 'Job Cards', icon: ClipboardList, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/deliveries', label: 'Deliveries', icon: PackageCheck, roles: ['STAFF', 'MANAGER', 'OWNER', 'DELIVERY_CLERK'] },
   { href: '/pos', label: 'Point of Sale', icon: ShoppingCart, roles: ['STAFF', 'MANAGER', 'OWNER'] },
+  { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/reports', label: 'Reports', icon: BarChart3, roles: ['MANAGER', 'OWNER'] },
   { href: '/suppliers', label: 'Suppliers', icon: Truck, roles: ['MANAGER', 'OWNER'] },
   { href: '/import', label: 'Import', icon: Upload, roles: ['MANAGER', 'OWNER'] },
