@@ -141,6 +141,11 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+          <div className="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-4 text-xs text-gray-400">
+            <a href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</a>
+            <span>·</span>
+            <a href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</a>
+          </div>
         </CardContent>
       </Card>
     </div>
