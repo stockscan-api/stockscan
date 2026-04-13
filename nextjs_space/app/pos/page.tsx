@@ -24,6 +24,8 @@ import {
   Printer,
   ArrowLeft,
   CheckCircle2,
+  Pencil,
+  Tag,
 } from 'lucide-react';
 
 interface CartItem {
@@ -31,6 +33,7 @@ interface CartItem {
   name: string;
   sku: string;
   price: number;
+  originalPrice: number;
   quantity: number;
 }
 
@@ -191,11 +194,13 @@ export default function PosPage() {
       if (existing) {
         return prev.map(i => i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i);
       }
+      const unitPrice = product.unitPrice ?? product.sellingPrice ?? product.price ?? 0;
       return [...prev, {
         productId: product.id,
         name: product.name,
         sku: product.sku,
-        price: product.unitPrice ?? product.sellingPrice ?? product.price ?? 0,
+        price: unitPrice,
+        originalPrice: unitPrice,
         quantity: 1,
       }];
     });
@@ -209,6 +214,20 @@ export default function PosPage() {
       }
       return i;
     }));
+  };
+
+  const setCartQty = (productId: string, qty: number) => {
+    if (qty < 1) return;
+    setCart(prev => prev.map(i => i.productId === productId ? { ...i, quantity: qty } : i));
+  };
+
+  const setCartPrice = (productId: string, newPrice: number) => {
+    if (newPrice < 0) return;
+    setCart(prev => prev.map(i => i.productId === productId ? { ...i, price: newPrice } : i));
+  };
+
+  const resetCartPrice = (productId: string) => {
+    setCart(prev => prev.map(i => i.productId === productId ? { ...i, price: i.originalPrice } : i));
   };
 
   const removeFromCart = (productId: string) => {
@@ -724,24 +743,68 @@ export default function PosPage() {
                     </div>
                   ) : (
                     cart.map(item => (
-                      <div key={item.productId} className="p-3 flex items-center gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
-                          <p className="text-xs text-gray-500">£{item.price.toFixed(2)} each</p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => updateCartQty(item.productId, -1)} className="p-1 rounded bg-gray-100 hover:bg-gray-200">
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                          <button onClick={() => updateCartQty(item.productId, 1)} className="p-1 rounded bg-gray-100 hover:bg-gray-200">
-                            <Plus className="h-3 w-3" />
+                      <div key={item.productId} className="p-3 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                          </div>
+                          <p className="text-sm font-bold text-gray-900 w-20 text-right">£{(item.price * item.quantity).toFixed(2)}</p>
+                          <button onClick={() => removeFromCart(item.productId)} className="p-1 text-red-400 hover:text-red-600">
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                        <p className="text-sm font-semibold text-gray-900 w-16 text-right">£{(item.price * item.quantity).toFixed(2)}</p>
-                        <button onClick={() => removeFromCart(item.productId)} className="p-1 text-red-400 hover:text-red-600">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {/* Qty controls: -/+ buttons with editable input */}
+                          <div className="flex items-center gap-1 bg-gray-50 rounded-lg px-1 py-0.5">
+                            <button onClick={() => updateCartQty(item.productId, -1)} className="p-1 rounded hover:bg-gray-200 transition-colors">
+                              <Minus className="h-3 w-3 text-gray-600" />
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                if (!isNaN(val) && val >= 1) setCartQty(item.productId, val);
+                              }}
+                              className="w-12 text-center text-sm font-semibold bg-white border border-gray-200 rounded py-0.5 focus:ring-2 focus:ring-blue-400 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <button onClick={() => updateCartQty(item.productId, 1)} className="p-1 rounded hover:bg-gray-200 transition-colors">
+                              <Plus className="h-3 w-3 text-gray-600" />
+                            </button>
+                          </div>
+                          <span className="text-xs text-gray-400">×</span>
+                          {/* Price: editable input with discount indicator */}
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500">£</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.price.toFixed(2)}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                if (!isNaN(val) && val >= 0) setCartPrice(item.productId, val);
+                              }}
+                              className="w-20 text-sm font-medium bg-white border border-gray-200 rounded py-0.5 px-1 text-right focus:ring-2 focus:ring-blue-400 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            {item.price !== item.originalPrice && (
+                              <button
+                                onClick={() => resetCartPrice(item.productId)}
+                                title={`Reset to £${item.originalPrice.toFixed(2)}`}
+                                className="p-0.5 text-amber-500 hover:text-amber-700 transition-colors"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                          {/* Discount badge */}
+                          {item.price < item.originalPrice && (
+                            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap">
+                              -{Math.round((1 - item.price / item.originalPrice) * 100)}%
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
