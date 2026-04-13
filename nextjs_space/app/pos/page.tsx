@@ -123,6 +123,12 @@ export default function PosPage() {
   const [processing, setProcessing] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Custom (non-stock) item
+  const [showCustomItem, setShowCustomItem] = useState(false);
+  const [customItemName, setCustomItemName] = useState('');
+  const [customItemPrice, setCustomItemPrice] = useState('');
+  const [customItemQty, setCustomItemQty] = useState('1');
+
   // Invoice data for receipt view (works for both new sales and historical lookups)
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
 
@@ -230,6 +236,28 @@ export default function PosPage() {
     setCart(prev => prev.map(i => i.productId === productId ? { ...i, price: i.originalPrice } : i));
   };
 
+  const addCustomItem = () => {
+    const name = customItemName.trim();
+    const price = parseFloat(customItemPrice);
+    const qty = parseInt(customItemQty, 10) || 1;
+    if (!name) { toast.error('Enter an item description'); return; }
+    if (isNaN(price) || price <= 0) { toast.error('Enter a valid price'); return; }
+    const customId = `custom-${Date.now()}`;
+    setCart(prev => [...prev, {
+      productId: customId,
+      name,
+      sku: 'NON-STOCK',
+      price,
+      originalPrice: price,
+      quantity: qty,
+    }]);
+    setCustomItemName('');
+    setCustomItemPrice('');
+    setCustomItemQty('1');
+    setShowCustomItem(false);
+    toast.success(`Added: ${name}`);
+  };
+
   const removeFromCart = (productId: string) => {
     setCart(prev => prev.filter(i => i.productId !== productId));
   };
@@ -247,10 +275,11 @@ export default function PosPage() {
     try {
       const saleData = {
         items: cart.map(i => ({
-          productId: i.productId,
+          productId: i.productId.startsWith('custom-') ? undefined as any : i.productId,
           productName: i.name,
           quantity: i.quantity,
           unitPrice: i.price,
+          ...(i.sku === 'NON-STOCK' ? { sku: 'NON-STOCK' } : {}),
         })),
         paymentMethod,
         customerName: customerName || undefined,
@@ -694,6 +723,73 @@ export default function PosPage() {
                 />
               </div>
 
+              {/* Custom Non-Stock Item */}
+              {showCustomItem ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-amber-900 flex items-center gap-2">
+                      <Tag className="h-4 w-4" /> Add Non-Stock Item
+                    </h3>
+                    <button onClick={() => setShowCustomItem(false)} className="p-1 hover:bg-amber-100 rounded">
+                      <X className="h-4 w-4 text-amber-600" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-3">
+                      <label className="text-xs font-medium text-amber-800 mb-1 block">Description *</label>
+                      <input
+                        type="text"
+                        value={customItemName}
+                        onChange={(e) => setCustomItemName(e.target.value)}
+                        placeholder="e.g. Labour charge, Misc part, Delivery fee..."
+                        className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-amber-400 bg-white"
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') addCustomItem(); }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-amber-800 mb-1 block">Unit Price (£) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={customItemPrice}
+                        onChange={(e) => setCustomItemPrice(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-amber-400 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        onKeyDown={(e) => { if (e.key === 'Enter') addCustomItem(); }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-amber-800 mb-1 block">Quantity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={customItemQty}
+                        onChange={(e) => setCustomItemQty(e.target.value)}
+                        className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-amber-400 bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        onKeyDown={(e) => { if (e.key === 'Enter') addCustomItem(); }}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        onClick={addCustomItem}
+                        className="w-full bg-amber-600 text-white py-2 px-4 rounded-lg text-sm font-semibold hover:bg-amber-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" /> Add to Cart
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowCustomItem(true)}
+                  className="w-full bg-white border-2 border-dashed border-amber-300 rounded-xl p-3 text-amber-700 hover:bg-amber-50 hover:border-amber-400 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+                >
+                  <Tag className="h-4 w-4" /> Add Non-Stock / Custom Item
+                </button>
+              )}
+
               {loading ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -746,7 +842,12 @@ export default function PosPage() {
                       <div key={item.productId} className="p-3 space-y-1.5">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {item.name}
+                              {item.sku === 'NON-STOCK' && (
+                                <span className="ml-1.5 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold align-middle">NON-STOCK</span>
+                              )}
+                            </p>
                           </div>
                           <p className="text-sm font-bold text-gray-900 w-20 text-right">£{(item.price * item.quantity).toFixed(2)}</p>
                           <button onClick={() => removeFromCart(item.productId)} className="p-1 text-red-400 hover:text-red-600">
