@@ -34,8 +34,9 @@ import {
   Legend,
 } from 'recharts';
 
-type ReportSection = 'inventory' | 'financial' | 'products';
+type ReportSection = 'inventory' | 'sales' | 'financial' | 'products';
 type InventoryTab = 'low-stock' | 'valuation' | 'movement';
+type SalesTab = 'summary' | 'by-product' | 'by-method';
 type FinancialTab = 'profit-loss' | 'category-performance';
 type ProductsTab = 'top-performers' | 'underperformers';
 
@@ -48,6 +49,7 @@ export default function ReportsPage() {
   const isOwner = hasRole(['OWNER']);
   const [section, setSection] = useState<ReportSection>('inventory');
   const [inventoryTab, setInventoryTab] = useState<InventoryTab>('low-stock');
+  const [salesTab, setSalesTab] = useState<SalesTab>('summary');
   const [financialTab, setFinancialTab] = useState<FinancialTab>('profit-loss');
   const [productsTab, setProductsTab] = useState<ProductsTab>('top-performers');
   const [loading, setLoading] = useState(false);
@@ -65,7 +67,7 @@ export default function ReportsPage() {
   }, []);
 
   // Which sub-tab is active based on section
-  const activeSubTab = section === 'inventory' ? inventoryTab : section === 'financial' ? financialTab : productsTab;
+  const activeSubTab = section === 'inventory' ? inventoryTab : section === 'sales' ? salesTab : section === 'financial' ? financialTab : productsTab;
 
   // Does this sub-tab need date range?
   const needsDateRange = !['low-stock', 'valuation'].includes(activeSubTab);
@@ -83,6 +85,12 @@ export default function ReportsPage() {
           case 'low-stock': data = await apiClient.getReportLowStock(); break;
           case 'valuation': data = await apiClient.getReportValuation(); break;
           case 'movement': data = await apiClient.getReportMovement(dates); break;
+        }
+      } else if (section === 'sales') {
+        switch (salesTab) {
+          case 'summary': data = await apiClient.getReportSalesSummary(dates); break;
+          case 'by-product': data = await apiClient.getReportSalesByProduct(dates); break;
+          case 'by-method': data = await apiClient.getReportSalesByMethod(dates); break;
         }
       } else if (section === 'financial') {
         switch (financialTab) {
@@ -102,7 +110,7 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [section, inventoryTab, financialTab, productsTab, startDate, endDate, mounted]);
+  }, [section, inventoryTab, salesTab, financialTab, productsTab, startDate, endDate, mounted]);
 
   useEffect(() => {
     if (mounted && startDate && endDate) fetchReport();
@@ -138,6 +146,7 @@ export default function ReportsPage() {
 
   const sections = [
     { key: 'inventory' as const, label: 'Inventory', icon: Package },
+    { key: 'sales' as const, label: 'Sales', icon: Layers },
     ...(isOwner ? [{ key: 'financial' as const, label: 'Financial', icon: DollarSign }] : []),
     { key: 'products' as const, label: 'Products', icon: ShoppingCart },
   ];
@@ -146,6 +155,12 @@ export default function ReportsPage() {
     { key: 'low-stock' as const, label: 'Low Stock' },
     { key: 'valuation' as const, label: 'Stock Valuation' },
     { key: 'movement' as const, label: 'Stock Movement' },
+  ];
+
+  const salesTabs = [
+    { key: 'summary' as const, label: 'Sales Summary' },
+    { key: 'by-product' as const, label: 'Sales by Product' },
+    { key: 'by-method' as const, label: 'Sales by Method' },
   ];
 
   const financialTabs = [
@@ -158,8 +173,8 @@ export default function ReportsPage() {
     { key: 'underperformers' as const, label: 'Underperformers' },
   ];
 
-  const subTabs = section === 'inventory' ? inventoryTabs : section === 'financial' ? financialTabs : productsTabs;
-  const activeSubTabSetter = section === 'inventory' ? setInventoryTab : section === 'financial' ? setFinancialTab : setProductsTab;
+  const subTabs = section === 'inventory' ? inventoryTabs : section === 'sales' ? salesTabs : section === 'financial' ? financialTabs : productsTabs;
+  const activeSubTabSetter = section === 'inventory' ? setInventoryTab : section === 'sales' ? setSalesTab : section === 'financial' ? setFinancialTab : setProductsTab;
 
   if (!mounted) return <DashboardLayout><div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div></DashboardLayout>;
 
@@ -271,6 +286,9 @@ export default function ReportsPage() {
                 {section === 'inventory' && inventoryTab === 'low-stock' && <LowStockReport data={reportData} />}
                 {section === 'inventory' && inventoryTab === 'valuation' && <ValuationReport data={reportData} />}
                 {section === 'inventory' && inventoryTab === 'movement' && <MovementReport data={reportData} />}
+                {section === 'sales' && salesTab === 'summary' && <SalesSummaryReport data={reportData} />}
+                {section === 'sales' && salesTab === 'by-product' && <SalesByProductReport data={reportData} />}
+                {section === 'sales' && salesTab === 'by-method' && <SalesByMethodReport data={reportData} />}
                 {section === 'financial' && financialTab === 'profit-loss' && <ProfitLossReport data={reportData} />}
                 {section === 'financial' && financialTab === 'category-performance' && <CategoryPerformanceReport data={reportData} />}
                 {section === 'products' && productsTab === 'top-performers' && <TopPerformersReport data={reportData} />}
@@ -701,6 +719,178 @@ function UnderperformersReport({ data }: { data: any }) {
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// ============ SALES SUMMARY REPORT ============
+function SalesSummaryReport({ data }: { data: any }) {
+  const summary = data.summary || data;
+  const dailySales = data.dailySales || data.daily || [];
+
+  const totalSales = summary.totalSales ?? summary.salesCount ?? 0;
+  const totalRevenue = summary.totalRevenue ?? summary.revenue ?? 0;
+  const totalVAT = summary.totalVAT ?? summary.vat ?? 0;
+  const avgSaleValue = summary.averageSaleValue ?? summary.avgSale ?? (totalSales > 0 ? totalRevenue / totalSales : 0);
+  const refunds = summary.refundCount ?? summary.refunds ?? 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <SummaryCard label="Total Sales" value={totalSales} color="blue" />
+        <SummaryCard label="Revenue" value={formatCurrency(totalRevenue)} color="green" />
+        <SummaryCard label="VAT Collected" value={formatCurrency(totalVAT)} color="purple" />
+        <SummaryCard label="Avg Sale Value" value={formatCurrency(avgSaleValue)} color="blue" />
+        <SummaryCard label="Refunds" value={refunds} color="red" />
+      </div>
+
+      {dailySales.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Sales Trend</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={dailySales}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v: string) => { try { return new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }); } catch { return v; } }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip formatter={(v: any) => formatCurrency(v)} labelFormatter={(v: string) => { try { return new Date(v).toLocaleDateString(); } catch { return v; } }} />
+              <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Revenue" />
+              <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} name="Orders" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============ SALES BY PRODUCT REPORT ============
+function SalesByProductReport({ data }: { data: any }) {
+  const summary = data.summary || {};
+  const products = data.products || data.items || data.byProduct || [];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SummaryCard label="Products Sold" value={summary.productCount ?? products.length} color="blue" />
+        <SummaryCard label="Total Revenue" value={formatCurrency(summary.totalRevenue ?? 0)} color="green" />
+        <SummaryCard label="Total Units Sold" value={summary.totalUnitsSold ?? 0} color="purple" />
+      </div>
+
+      {products.length > 0 && (
+        <>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Products by Revenue</h3>
+            <ResponsiveContainer width="100%" height={Math.min(400, products.slice(0, 10).length * 40 + 40)}>
+              <BarChart data={products.slice(0, 10)} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" tick={{ fontSize: 12 }} />
+                <YAxis dataKey="name" type="category" width={140} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v: any) => formatCurrency(v)} />
+                <Bar dataKey="revenue" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Revenue" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Sales Details</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-4 py-2 font-medium text-gray-600">#</th>
+                    <th className="text-left px-4 py-2 font-medium text-gray-600">Product</th>
+                    <th className="text-left px-4 py-2 font-medium text-gray-600">SKU</th>
+                    <th className="text-right px-4 py-2 font-medium text-gray-600">Revenue</th>
+                    <th className="text-right px-4 py-2 font-medium text-gray-600">Qty Sold</th>
+                    <th className="text-right px-4 py-2 font-medium text-gray-600">Avg Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((p: any, idx: number) => (
+                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-4 py-2 text-gray-500">{idx + 1}</td>
+                      <td className="px-4 py-2 font-medium text-gray-900">{p.name || p.productName}</td>
+                      <td className="px-4 py-2 text-gray-500 font-mono text-xs">{p.sku || '-'}</td>
+                      <td className="px-4 py-2 text-right font-medium text-green-600">{formatCurrency(p.revenue ?? p.totalRevenue ?? 0)}</td>
+                      <td className="px-4 py-2 text-right text-gray-600">{p.quantitySold ?? p.unitsSold ?? p.quantity ?? 0}</td>
+                      <td className="px-4 py-2 text-right text-gray-600">{formatCurrency(p.averagePrice ?? p.avgPrice ?? 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============ SALES BY METHOD REPORT ============
+function SalesByMethodReport({ data }: { data: any }) {
+  const summary = data.summary || {};
+  const methods = data.methods || data.byMethod || data.paymentMethods || [];
+
+  const methodColors: Record<string, string> = {
+    CASH: '#10b981',
+    CARD: '#3b82f6',
+    TRANSFER: '#8b5cf6',
+    CREDIT: '#f59e0b',
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SummaryCard label="Payment Methods" value={summary.methodCount ?? methods.length} color="blue" />
+        <SummaryCard label="Total Sales" value={summary.totalSales ?? 0} color="green" />
+        <SummaryCard label="Total Revenue" value={formatCurrency(summary.totalRevenue ?? 0)} color="purple" />
+      </div>
+
+      {methods.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue by Payment Method</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie data={methods} dataKey="revenue" nameKey="method" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                  {methods.map((m: any, i: number) => (
+                    <Cell key={i} fill={methodColors[m.method?.toUpperCase()] || COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v: any) => formatCurrency(v)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Method Breakdown</h3>
+            <div className="space-y-3">
+              {methods.map((m: any, i: number) => {
+                const color = methodColors[m.method?.toUpperCase()] || COLORS[i % COLORS.length];
+                const totalRev = methods.reduce((s: number, x: any) => s + (x.revenue || 0), 0);
+                const pct = totalRev > 0 ? ((m.revenue || 0) / totalRev * 100) : 0;
+                return (
+                  <div key={i} className="p-4 bg-gray-50 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="font-semibold text-gray-900">{m.method || m.paymentMethod || 'Unknown'}</span>
+                      </div>
+                      <span className="font-bold text-gray-900">{formatCurrency(m.revenue ?? m.total ?? 0)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <span>{m.count ?? m.salesCount ?? 0} transactions</span>
+                      <span>{pct.toFixed(1)}% of total</span>
+                    </div>
+                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                      <div className="h-2 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

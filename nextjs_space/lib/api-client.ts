@@ -833,6 +833,41 @@ class ApiClient {
     return this.request<any>('/api/reports/products/underperformers', { method: 'POST', body: JSON.stringify(params) });
   }
 
+  // Sales Reports
+  async getReportSalesSummary(params: { startDate: string; endDate: string }) {
+    return this.request<any>('/api/reports/sales/summary', { method: 'POST', body: JSON.stringify(params) });
+  }
+
+  async getReportSalesByProduct(params: { startDate: string; endDate: string }) {
+    return this.request<any>('/api/reports/sales/by-product', { method: 'POST', body: JSON.stringify(params) });
+  }
+
+  async getReportSalesByMethod(params: { startDate: string; endDate: string }) {
+    return this.request<any>('/api/reports/sales/by-method', { method: 'POST', body: JSON.stringify(params) });
+  }
+
+  // ============ PRODUCT CODES / BARCODES ============
+
+  async validateProductCode(data: { code: string; type?: string }) {
+    return this.request<any>('/api/product-codes/validate', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async generateProductCode(data: { productId: string; type?: string }) {
+    return this.request<any>('/api/product-codes/generate', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getAllProductCodes() {
+    return this.request<any>('/api/product-codes/all');
+  }
+
+  async getProductCodeSubscription() {
+    return this.request<any>('/api/product-codes/subscription');
+  }
+
+  async lookupBarcode(barcode: string) {
+    return this.request<any>(`/api/products/barcode/${encodeURIComponent(barcode)}`);
+  }
+
   // ============ POS (Point of Sale) ============
 
   async getPosSales(params?: { page?: number; limit?: number }) {
