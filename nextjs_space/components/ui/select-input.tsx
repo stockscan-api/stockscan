@@ -2,11 +2,11 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  options: { value: string; label: string }[];
+  options?: { value: string; label: string }[];
 }
 
 const SelectInput = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, options, ...props }, ref) => {
+  ({ className, options, children, ...props }, ref) => {
     return (
       <select
         className={cn(
@@ -16,7 +16,7 @@ const SelectInput = React.forwardRef<HTMLSelectElement, SelectProps>(
         ref={ref}
         {...props}
       >
-        {options?.map((option) => (
+        {children || options?.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>

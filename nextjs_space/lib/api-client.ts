@@ -881,6 +881,102 @@ class ApiClient {
   async updateCompanyDetails(companyId: string, data: { name?: string; email?: string; phone?: string; address?: string }) {
     return this.request<any>(`/api/company/${companyId}`, { method: 'PATCH', body: JSON.stringify(data) });
   }
+
+  // ============ WAREHOUSES ============
+
+  async getWarehouses() {
+    return this.request<any>('/api/warehouses');
+  }
+
+  async getWarehouse(id: string) {
+    return this.request<any>(`/api/warehouses/${id}`);
+  }
+
+  async createWarehouse(data: { name: string; code?: string; address?: string; isDefault?: boolean }) {
+    return this.request<any>('/api/warehouses', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateWarehouse(id: string, data: { name?: string; code?: string; address?: string; isDefault?: boolean; isActive?: boolean }) {
+    return this.request<any>(`/api/warehouses/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
+  async deleteWarehouse(id: string) {
+    return this.request<any>(`/api/warehouses/${id}`, { method: 'DELETE' });
+  }
+
+  async getWarehouseStock(warehouseId: string, params?: { page?: number; limit?: number; search?: string; categoryId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', String(params.page));
+    if (params?.limit) searchParams.append('limit', String(params.limit));
+    if (params?.search) searchParams.append('search', params.search);
+    if (params?.categoryId) searchParams.append('categoryId', params.categoryId);
+    const query = searchParams.toString();
+    return this.request<any>(`/api/warehouses/${warehouseId}/stock${query ? `?${query}` : ''}`);
+  }
+
+  // ============ STOCK TRANSFERS ============
+
+  async getStockTransfers(params?: { page?: number; limit?: number; status?: string; warehouseId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', String(params.page));
+    if (params?.limit) searchParams.append('limit', String(params.limit));
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.warehouseId) searchParams.append('warehouseId', params.warehouseId);
+    const query = searchParams.toString();
+    return this.request<any>(`/api/warehouses/stock-transfers${query ? `?${query}` : ''}`);
+  }
+
+  async createStockTransfer(data: { fromWarehouseId: string; toWarehouseId: string; items: Array<{ productId: string; quantity: number }> ; notes?: string }) {
+    return this.request<any>('/api/warehouses/stock-transfer', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  // ============ STOCKTAKES ============
+
+  async getStocktakes(params?: { page?: number; limit?: number; warehouseId?: string; status?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', String(params.page));
+    if (params?.limit) searchParams.append('limit', String(params.limit));
+    if (params?.warehouseId) searchParams.append('warehouseId', params.warehouseId);
+    if (params?.status) searchParams.append('status', params.status);
+    const query = searchParams.toString();
+    return this.request<any>(`/api/warehouses/stocktakes${query ? `?${query}` : ''}`);
+  }
+
+  async createStocktake(data: { warehouseId: string; items?: Array<{ productId: string; countedQuantity: number }> }) {
+    return this.request<any>('/api/warehouses/stocktake', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  // ============ PURCHASE ORDERS ============
+
+  async getPurchaseOrders(params?: { page?: number; limit?: number; status?: string; supplierId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', String(params.page));
+    if (params?.limit) searchParams.append('limit', String(params.limit));
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.supplierId) searchParams.append('supplierId', params.supplierId);
+    const query = searchParams.toString();
+    return this.request<any>(`/api/purchase-orders${query ? `?${query}` : ''}`);
+  }
+
+  async getPurchaseOrder(id: string) {
+    return this.request<any>(`/api/purchase-orders/${id}`);
+  }
+
+  async createPurchaseOrder(data: { supplierId: string; warehouseId?: string; items: Array<{ productId: string; quantityOrdered: number; unitPrice?: number }>; notes?: string }) {
+    return this.request<any>('/api/purchase-orders', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updatePurchaseOrder(id: string, data: any) {
+    return this.request<any>(`/api/purchase-orders/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
+  async receivePurchaseOrder(id: string, data: { items: Array<{ productId: string; quantityReceived: number }> }) {
+    return this.request<any>(`/api/purchase-orders/${id}/receive`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async deletePurchaseOrder(id: string) {
+    return this.request<any>(`/api/purchase-orders/${id}`, { method: 'DELETE' });
+  }
 }
 
 export const apiClient = new ApiClient();

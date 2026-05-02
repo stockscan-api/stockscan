@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api-client';
 import { useCurrency } from '@/contexts/currency-context';
-import { Package, AlertTriangle, Truck, Banknote, TrendingUp, TrendingDown, ArrowRightLeft, Loader2 } from 'lucide-react';
+import { Package, AlertTriangle, Truck, Banknote, TrendingUp, TrendingDown, ArrowRightLeft, Loader2, Warehouse, MapPin, Star } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/auth-context';
 import toast from 'react-hot-toast';
 import {
   BarChart,
@@ -27,10 +28,12 @@ const COLORS = ['#60B5FF', '#FF9149', '#FF9898', '#FF90BB', '#80D8C3', '#A19AD3'
 
 export default function DashboardPage() {
   const { formatPrice } = useCurrency();
+  const { hasRole } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -40,11 +43,12 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
-      // Fetch products, low stock items separately, and transactions
-      const [productsRes, lowStockRes, transactionsRes] = await Promise.all([
+      // Fetch products, low stock items separately, transactions, and warehouses
+      const [productsRes, lowStockRes, transactionsRes, warehousesRes] = await Promise.all([
         apiClient.getProducts({ limit: 50 }),
         apiClient.getProducts({ lowStock: true, limit: 50 }),
         apiClient.getTransactions({ limit: 15 }),
+        apiClient.getWarehouses().catch(() => []),
       ]);
 
       // Handle various API response formats
@@ -72,9 +76,11 @@ export default function DashboardPage() {
       const totalProductsCount = extractTotal(productsRes, allProducts);
       const lowStockCount = extractTotal(lowStockRes, lowStockItems);
 
+      const whList = Array.isArray(warehousesRes) ? warehousesRes : warehousesRes?.data || warehousesRes?.warehouses || [];
       setProducts(allProducts);
       setTransactions(allTransactions);
       setLowStockProducts(lowStockItems);
+      setWarehouses(whList);
 
       // Calculate stats using API totals
       const totalValue = allProducts.reduce((sum: number, p: any) => sum + (((p?.unitPrice ?? p?.price ?? 0)) * ((p?.quantity ?? p?.currentStock) || 0)), 0);
@@ -250,6 +256,63 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Warehouse Overview - Only for MANAGER/OWNER */}
+        {warehouses.length > 0 && hasRole(['MANAGER', 'OWNER']) && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Warehouse className="h-5 w-5 text-blue-600" />
+                  Warehouse Overview
+                </CardTitle>
+                <Link href="/warehouses" className="text-sm text-blue-600 hover:underline">
+                  View All →
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {warehouses.map((wh: any) => (
+                  <Link key={wh.id} href="/warehouses" className="block">
+                    <div className={`p-4 rounded-xl border hover:shadow-md transition-all cursor-pointer ${
+                      wh.isDefault ? 'border-amber-200 bg-amber-50/50' : 'border-gray-200 bg-gray-50/50'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Warehouse className={`h-4 w-4 ${wh.isDefault ? 'text-amber-600' : 'text-blue-600'}`} />
+                        <span className="font-semibold text-sm text-gray-900 truncate">{wh.name}</span>
+                        {wh.isDefault && <Star className="h-3 w-3 text-amber-500 fill-amber-500 flex-shrink-0" />}
+                      </div>
+                      {wh.address && (
+                        <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                          <MapPin className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{wh.address}</span>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="text-center bg-white rounded-lg p-2">
+                          <p className="text-lg font-bold text-gray-900">{wh.stockSummary?.totalProducts || wh._count?.warehouseStock || 0}</p>
+                          <p className="text-xs text-gray-500">Products</p>
+                        </div>
+                        <div className="text-center bg-white rounded-lg p-2">
+                          <p className="text-lg font-bold text-gray-900">{wh.stockSummary?.totalQuantity || 0}</p>
+                          <p className="text-xs text-gray-500">Total Qty</p>
+                        </div>
+                      </div>
+                      {(wh.stockSummary?.lowStockCount || 0) > 0 && (
+                        <div className="mt-2 text-xs text-red-600 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          {wh.stockSummary.lowStockCount} low stock
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
 
         {/* Quick Access & Recent Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
