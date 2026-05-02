@@ -90,7 +90,7 @@ export default function PurchaseOrdersPage() {
     try {
       setIsLoading(true);
       const [poRes, suppRes, whRes, prodRes] = await Promise.all([
-        apiClient.getPurchaseOrders({ limit: 100 }).catch(() => []),
+        apiClient.getPurchaseOrders().catch(() => []),
         apiClient.getSuppliers({ limit: 200 }).catch(() => []),
         apiClient.getWarehouses().catch(() => []),
         apiClient.getProducts({ limit: 500 }).catch(() => []),
@@ -180,10 +180,12 @@ export default function PurchaseOrdersPage() {
 
   const getStatusConfig = (status: string) => {
     const s = status?.toUpperCase();
-    if (s === 'RECEIVED' || s === 'COMPLETED') return { label: status, color: 'bg-green-100 text-green-700', icon: CheckCircle2 };
-    if (s === 'PARTIAL' || s === 'PARTIALLY_RECEIVED') return { label: 'Partial', color: 'bg-blue-100 text-blue-700', icon: ArrowDownToLine };
-    if (s === 'PENDING' || s === 'DRAFT' || s === 'ORDERED') return { label: status, color: 'bg-amber-100 text-amber-700', icon: Clock };
-    if (s === 'CANCELLED') return { label: status, color: 'bg-red-100 text-red-700', icon: XCircle };
+    if (s === 'RECEIVED' || s === 'COMPLETED') return { label: 'Received', color: 'bg-green-100 text-green-700', icon: CheckCircle2 };
+    if (s === 'PARTIALLY_RECEIVED') return { label: 'Partial', color: 'bg-blue-100 text-blue-700', icon: ArrowDownToLine };
+    if (s === 'SENT') return { label: 'Sent', color: 'bg-indigo-100 text-indigo-700', icon: Truck };
+    if (s === 'DRAFT') return { label: 'Draft', color: 'bg-gray-100 text-gray-700', icon: Clock };
+    if (s === 'PENDING' || s === 'ORDERED') return { label: status, color: 'bg-amber-100 text-amber-700', icon: Clock };
+    if (s === 'CANCELLED') return { label: 'Cancelled', color: 'bg-red-100 text-red-700', icon: XCircle };
     return { label: status || 'Unknown', color: 'bg-gray-100 text-gray-700', icon: Clock };
   };
 
@@ -248,7 +250,7 @@ export default function PurchaseOrdersPage() {
                   <div>
                     <p className="text-xs text-gray-500">Pending</p>
                     <p className="text-xl font-bold">
-                      {orders.filter(o => ['PENDING', 'DRAFT', 'ORDERED'].includes(o.status?.toUpperCase())).length}
+                      {orders.filter(o => ['DRAFT', 'SENT'].includes(o.status?.toUpperCase())).length}
                     </p>
                   </div>
                 </div>
@@ -304,8 +306,8 @@ export default function PurchaseOrdersPage() {
             className="w-48"
           >
             <option value="">All Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="ORDERED">Ordered</option>
+            <option value="DRAFT">Draft</option>
+            <option value="SENT">Sent</option>
             <option value="PARTIALLY_RECEIVED">Partially Received</option>
             <option value="RECEIVED">Received</option>
             <option value="CANCELLED">Cancelled</option>

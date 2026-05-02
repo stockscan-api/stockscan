@@ -983,12 +983,9 @@ class ApiClient {
 
   // ============ PURCHASE ORDERS ============
 
-  async getPurchaseOrders(params?: { page?: number; limit?: number; status?: string; supplierId?: string }) {
+  async getPurchaseOrders(params?: { status?: string }) {
     const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.append('page', String(params.page));
-    if (params?.limit) searchParams.append('limit', String(params.limit));
     if (params?.status) searchParams.append('status', params.status);
-    if (params?.supplierId) searchParams.append('supplierId', params.supplierId);
     const query = searchParams.toString();
     return this.request<any>(`/api/purchase-orders${query ? `?${query}` : ''}`);
   }
