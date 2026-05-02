@@ -128,6 +128,10 @@ export default function WarehousesPage() {
       toast.error('Warehouse name is required');
       return;
     }
+    if (!formData.code.trim()) {
+      toast.error('Warehouse code is required');
+      return;
+    }
     try {
       setIsSubmitting(true);
       if (editingWarehouse) {
@@ -684,11 +688,12 @@ export default function WarehousesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Code</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Code *</label>
               <Input
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 placeholder="e.g. WH-001"
+                required
               />
             </div>
             <div>
