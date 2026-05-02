@@ -999,10 +999,10 @@ class ApiClient {
   }
 
   async updatePurchaseOrder(id: string, data: any) {
-    return this.request<any>(`/api/purchase-orders/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+    return this.request<any>(`/api/purchase-orders/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   }
 
-  async receivePurchaseOrder(id: string, data: { items: Array<{ productId: string; quantityReceived: number }> }) {
+  async receivePurchaseOrder(id: string, data: { items: Array<{ itemId: string; quantityReceived: number }> }) {
     return this.request<any>(`/api/purchase-orders/${id}/receive`, { method: 'POST', body: JSON.stringify(data) });
   }
 

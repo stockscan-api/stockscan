@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { SelectInput } from '@/components/ui/select-input';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { apiClient } from '@/lib/api-client';
 import { useCurrency } from '@/contexts/currency-context';
 import {
@@ -17,7 +18,6 @@ import {
   Search,
   Truck,
   Calendar,
-  User,
   CheckCircle2,
   Clock,
   XCircle,
@@ -25,9 +25,14 @@ import {
   Trash2,
   FileText,
   DollarSign,
-  Hash,
   Eye,
   ArrowDownToLine,
+  Send,
+  PackageCheck,
+  X,
+  Ban,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -47,6 +52,7 @@ interface PurchaseOrder {
     quantityOrdered: number;
     quantityReceived?: number;
     unitPrice?: number;
+    totalPrice?: number;
     product?: { name: string; sku?: string };
   }>;
   createdBy?: { name: string };
@@ -73,14 +79,25 @@ export default function PurchaseOrdersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  // Form state
+  // Create form state
   const [formSupplier, setFormSupplier] = useState('');
   const [formWarehouse, setFormWarehouse] = useState('');
   const [formNotes, setFormNotes] = useState('');
   const [formItems, setFormItems] = useState<POItem[]>([]);
   const [productSearch, setProductSearch] = useState('');
+
+  // Receive modal state
+  const [receiveModalOpen, setReceiveModalOpen] = useState(false);
+  const [receivingOrder, setReceivingOrder] = useState<PurchaseOrder | null>(null);
+  const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
+  const [isReceiving, setIsReceiving] = useState(false);
+
+  // Action states
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -108,6 +125,7 @@ export default function PurchaseOrdersPage() {
     }
   };
 
+  // ========== CREATE PO ==========
   const addProduct = (product: any) => {
     const id = product.id;
     if (formItems.some(i => i.productId === id)) {
@@ -178,16 +196,115 @@ export default function PurchaseOrdersPage() {
     setProductSearch('');
   };
 
+  // ========== SEND PO (DRAFT -> SENT) ==========
+  const handleSendPO = async (order: PurchaseOrder) => {
+    setActionLoading(order.id);
+    try {
+      await apiClient.updatePurchaseOrder(order.id, { status: 'SENT' });
+      toast.success(`${order.poNumber || 'PO'} marked as Sent`);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to send purchase order');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ========== RECEIVE STOCK ==========
+  const openReceiveModal = (order: PurchaseOrder) => {
+    setReceivingOrder(order);
+    // Pre-fill with remaining quantities
+    const qtys: Record<string, number> = {};
+    order.items?.forEach(item => {
+      const remaining = (item.quantityOrdered || 0) - (item.quantityReceived || 0);
+      qtys[item.id] = Math.max(0, remaining);
+    });
+    setReceiveQuantities(qtys);
+    setReceiveModalOpen(true);
+  };
+
+  const handleReceiveStock = async () => {
+    if (!receivingOrder) return;
+
+    const items = receivingOrder.items
+      ?.filter(item => (receiveQuantities[item.id] || 0) > 0)
+      .map(item => ({
+        itemId: item.id,
+        quantityReceived: receiveQuantities[item.id] || 0,
+      })) || [];
+
+    if (items.length === 0) {
+      toast.error('Enter quantity for at least one item');
+      return;
+    }
+
+    setIsReceiving(true);
+    try {
+      await apiClient.receivePurchaseOrder(receivingOrder.id, { items });
+      toast.success('Stock received successfully');
+      setReceiveModalOpen(false);
+      setReceivingOrder(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to receive stock');
+    } finally {
+      setIsReceiving(false);
+    }
+  };
+
+  // ========== CANCEL PO ==========
+  const handleCancelPO = async (id: string) => {
+    setActionLoading(id);
+    try {
+      await apiClient.updatePurchaseOrder(id, { status: 'CANCELLED' });
+      toast.success('Purchase order cancelled');
+      setCancelConfirmId(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to cancel purchase order');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ========== DELETE PO ==========
+  const handleDeletePO = async (id: string) => {
+    setActionLoading(id);
+    try {
+      await apiClient.deletePurchaseOrder(id);
+      toast.success('Purchase order deleted');
+      setDeleteConfirmId(null);
+      if (expandedOrderId === id) setExpandedOrderId(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to delete purchase order');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ========== STATUS HELPERS ==========
   const getStatusConfig = (status: string) => {
     const s = status?.toUpperCase();
     if (s === 'RECEIVED' || s === 'COMPLETED') return { label: 'Received', color: 'bg-green-100 text-green-700', icon: CheckCircle2 };
     if (s === 'PARTIALLY_RECEIVED') return { label: 'Partial', color: 'bg-blue-100 text-blue-700', icon: ArrowDownToLine };
     if (s === 'SENT') return { label: 'Sent', color: 'bg-indigo-100 text-indigo-700', icon: Truck };
     if (s === 'DRAFT') return { label: 'Draft', color: 'bg-gray-100 text-gray-700', icon: Clock };
-    if (s === 'PENDING' || s === 'ORDERED') return { label: status, color: 'bg-amber-100 text-amber-700', icon: Clock };
     if (s === 'CANCELLED') return { label: 'Cancelled', color: 'bg-red-100 text-red-700', icon: XCircle };
     return { label: status || 'Unknown', color: 'bg-gray-100 text-gray-700', icon: Clock };
   };
+
+  const canReceive = (status: string) => {
+    const s = status?.toUpperCase();
+    return s === 'SENT' || s === 'PARTIALLY_RECEIVED';
+  };
+
+  const canSend = (status: string) => status?.toUpperCase() === 'DRAFT';
+  const canCancel = (status: string) => {
+    const s = status?.toUpperCase();
+    return s === 'DRAFT' || s === 'SENT';
+  };
+  const canDelete = (status: string) => status?.toUpperCase() === 'DRAFT';
 
   const filteredOrders = orders.filter(o => {
     if (statusFilter && o.status?.toUpperCase() !== statusFilter) return false;
@@ -217,7 +334,7 @@ export default function PurchaseOrdersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Purchase Orders</h1>
-            <p className="text-gray-500 mt-1">Order stock from suppliers</p>
+            <p className="text-gray-500 mt-1">Order stock from suppliers and receive deliveries</p>
           </div>
           <Button onClick={() => { resetForm(); setIsModalOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />
@@ -248,9 +365,9 @@ export default function PurchaseOrdersPage() {
                     <Clock className="h-5 w-5 text-amber-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Pending</p>
+                    <p className="text-xs text-gray-500">Awaiting</p>
                     <p className="text-xl font-bold">
-                      {orders.filter(o => ['DRAFT', 'SENT'].includes(o.status?.toUpperCase())).length}
+                      {orders.filter(o => ['DRAFT', 'SENT', 'PARTIALLY_RECEIVED'].includes(o.status?.toUpperCase())).length}
                     </p>
                   </div>
                 </div>
@@ -338,17 +455,15 @@ export default function PurchaseOrdersPage() {
             {filteredOrders.map((order) => {
               const statusCfg = getStatusConfig(order.status);
               const StatusIcon = statusCfg.icon;
-              const isSelected = selectedOrder?.id === order.id;
+              const isExpanded = expandedOrderId === order.id;
               return (
-                <Card
-                  key={order.id}
-                  className={`hover:shadow-md transition-shadow cursor-pointer ${
-                    isSelected ? 'ring-2 ring-blue-500' : ''
-                  }`}
-                  onClick={() => setSelectedOrder(isSelected ? null : order)}
-                >
+                <Card key={order.id} className={`transition-shadow ${isExpanded ? 'ring-2 ring-blue-500 shadow-md' : 'hover:shadow-md'}`}>
                   <CardContent className="p-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    {/* Order header row */}
+                    <div
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer"
+                      onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                    >
                       <div className="flex items-center gap-4">
                         <div className="p-2.5 bg-orange-100 rounded-xl">
                           <ShoppingBag className="h-5 w-5 text-orange-600" />
@@ -390,44 +505,124 @@ export default function PurchaseOrdersPage() {
                             {new Date(order.orderDate || order.createdAt || '').toLocaleDateString()}
                           </span>
                         )}
+                        {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
                       </div>
                     </div>
-                    {/* Detail view */}
-                    {isSelected && order.items && order.items.length > 0 && (
-                      <div className="mt-4 pt-4 border-t">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Order Items</h4>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b bg-gray-50">
-                                <th className="text-left py-2 px-3 font-medium text-gray-600">Product</th>
-                                <th className="text-right py-2 px-3 font-medium text-gray-600">Ordered</th>
-                                <th className="text-right py-2 px-3 font-medium text-gray-600">Received</th>
-                                <th className="text-right py-2 px-3 font-medium text-gray-600">Unit Price</th>
-                                <th className="text-right py-2 px-3 font-medium text-gray-600">Total</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {order.items.map((item, idx) => (
-                                <tr key={item.id || idx} className="border-b">
-                                  <td className="py-2 px-3">
-                                    <span className="font-medium">{item.product?.name || 'Unknown'}</span>
-                                    {item.product?.sku && <span className="text-gray-400 ml-2 text-xs font-mono">{item.product.sku}</span>}
-                                  </td>
-                                  <td className="py-2 px-3 text-right">{item.quantityOrdered}</td>
-                                  <td className="py-2 px-3 text-right">{item.quantityReceived ?? '—'}</td>
-                                  <td className="py-2 px-3 text-right">{item.unitPrice != null ? formatPrice(item.unitPrice) : '—'}</td>
-                                  <td className="py-2 px-3 text-right font-medium">
-                                    {item.unitPrice != null ? formatPrice(item.quantityOrdered * item.unitPrice) : '—'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+
+                    {/* Expanded detail */}
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t space-y-4">
+                        {/* Action buttons */}
+                        <div className="flex flex-wrap gap-2">
+                          {canReceive(order.status) && (
+                            <Button
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); openReceiveModal(order); }}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              <PackageCheck className="h-3.5 w-3.5 mr-1.5" />
+                              Receive Stock
+                            </Button>
+                          )}
+                          {canSend(order.status) && (
+                            <Button
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); handleSendPO(order); }}
+                              disabled={actionLoading === order.id}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            >
+                              {actionLoading === order.id ? (
+                                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                              ) : (
+                                <Send className="h-3.5 w-3.5 mr-1.5" />
+                              )}
+                              Mark as Sent
+                            </Button>
+                          )}
+                          {canCancel(order.status) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => { e.stopPropagation(); setCancelConfirmId(order.id); }}
+                              disabled={actionLoading === order.id}
+                              className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                            >
+                              <Ban className="h-3.5 w-3.5 mr-1.5" />
+                              Cancel Order
+                            </Button>
+                          )}
+                          {canDelete(order.status) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(order.id); }}
+                              disabled={actionLoading === order.id}
+                              className="text-red-600 border-red-300 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                              Delete
+                            </Button>
+                          )}
                         </div>
-                        {order.notes && (
-                          <p className="text-xs text-gray-500 mt-3">Notes: {order.notes}</p>
+
+                        {/* Items table */}
+                        {order.items && order.items.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-700 mb-3">Order Items</h4>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="border-b bg-gray-50">
+                                    <th className="text-left py-2 px-3 font-medium text-gray-600">Product</th>
+                                    <th className="text-right py-2 px-3 font-medium text-gray-600">Ordered</th>
+                                    <th className="text-right py-2 px-3 font-medium text-gray-600">Received</th>
+                                    <th className="text-right py-2 px-3 font-medium text-gray-600">Outstanding</th>
+                                    <th className="text-right py-2 px-3 font-medium text-gray-600">Unit Price</th>
+                                    <th className="text-right py-2 px-3 font-medium text-gray-600">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {order.items.map((item, idx) => {
+                                    const received = item.quantityReceived || 0;
+                                    const ordered = item.quantityOrdered || 0;
+                                    const outstanding = ordered - received;
+                                    return (
+                                      <tr key={item.id || idx} className="border-b">
+                                        <td className="py-2 px-3">
+                                          <span className="font-medium">{item.product?.name || 'Unknown'}</span>
+                                          {item.product?.sku && <span className="text-gray-400 ml-2 text-xs font-mono">{item.product.sku}</span>}
+                                        </td>
+                                        <td className="py-2 px-3 text-right">{ordered}</td>
+                                        <td className="py-2 px-3 text-right">
+                                          <span className={received >= ordered ? 'text-green-600 font-medium' : received > 0 ? 'text-blue-600 font-medium' : 'text-gray-400'}>
+                                            {received}
+                                          </span>
+                                        </td>
+                                        <td className="py-2 px-3 text-right">
+                                          {outstanding > 0 ? (
+                                            <span className="text-amber-600 font-medium">{outstanding}</span>
+                                          ) : (
+                                            <span className="text-green-600">✓</span>
+                                          )}
+                                        </td>
+                                        <td className="py-2 px-3 text-right">{item.unitPrice != null ? formatPrice(item.unitPrice) : '—'}</td>
+                                        <td className="py-2 px-3 text-right font-medium">
+                                          {item.unitPrice != null ? formatPrice(ordered * item.unitPrice) : '—'}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
                         )}
+
+                        {/* Notes & metadata */}
+                        <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                          {order.notes && <span>Notes: {order.notes}</span>}
+                          {order.createdBy?.name && <span>Created by {order.createdBy.name}</span>}
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -437,7 +632,7 @@ export default function PurchaseOrdersPage() {
           </div>
         )}
 
-        {/* Create PO Modal */}
+        {/* ========== CREATE PO MODAL ========== */}
         <Modal isOpen={isModalOpen} onClose={resetForm} title="New Purchase Order">
           <form onSubmit={handleCreate} className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
@@ -568,6 +763,145 @@ export default function PurchaseOrdersPage() {
             </div>
           </form>
         </Modal>
+
+        {/* ========== RECEIVE STOCK MODAL ========== */}
+        <Modal
+          isOpen={receiveModalOpen}
+          onClose={() => { setReceiveModalOpen(false); setReceivingOrder(null); }}
+          title={`Receive Stock — ${receivingOrder?.poNumber || 'Purchase Order'}`}
+        >
+          <div className="space-y-5">
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+              <Truck className="h-5 w-5 text-blue-600 flex-shrink-0" />
+              <div className="text-sm">
+                <span className="font-medium text-blue-900">{receivingOrder?.supplier?.name}</span>
+                <span className="text-blue-600 ml-2">•</span>
+                <span className="text-blue-700 ml-2">{receivingOrder?.items?.length || 0} items</span>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-600">
+              Enter the quantity received for each item. Leave at 0 for items not yet delivered.
+            </p>
+
+            <div className="space-y-3">
+              {receivingOrder?.items?.map((item) => {
+                const ordered = item.quantityOrdered || 0;
+                const alreadyReceived = item.quantityReceived || 0;
+                const remaining = ordered - alreadyReceived;
+                const qtyToReceive = receiveQuantities[item.id] || 0;
+
+                return (
+                  <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{item.product?.name || 'Unknown'}</p>
+                      <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
+                        {item.product?.sku && <span className="font-mono">{item.product.sku}</span>}
+                        <span>Ordered: {ordered}</span>
+                        {alreadyReceived > 0 && (
+                          <span className="text-blue-600">Already received: {alreadyReceived}</span>
+                        )}
+                        <span className="text-amber-600 font-medium">Remaining: {remaining}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <label className="text-xs text-gray-500">Qty</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={remaining}
+                        value={qtyToReceive}
+                        onChange={(e) => {
+                          const val = Math.min(Math.max(0, parseInt(e.target.value) || 0), remaining);
+                          setReceiveQuantities(prev => ({ ...prev, [item.id]: val }));
+                        }}
+                        className="w-20 text-center"
+                      />
+                      {/* Quick fill button */}
+                      {qtyToReceive < remaining && (
+                        <button
+                          type="button"
+                          onClick={() => setReceiveQuantities(prev => ({ ...prev, [item.id]: remaining }))}
+                          className="text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                        >
+                          All ({remaining})
+                        </button>
+                      )}
+                      {qtyToReceive === remaining && remaining > 0 && (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Receive all shortcut */}
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const all: Record<string, number> = {};
+                  receivingOrder?.items?.forEach(item => {
+                    all[item.id] = (item.quantityOrdered || 0) - (item.quantityReceived || 0);
+                  });
+                  setReceiveQuantities(all);
+                }}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Receive all remaining
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const reset: Record<string, number> = {};
+                  receivingOrder?.items?.forEach(item => { reset[item.id] = 0; });
+                  setReceiveQuantities(reset);
+                }}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Clear all
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => { setReceiveModalOpen(false); setReceivingOrder(null); }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleReceiveStock}
+                disabled={isReceiving || Object.values(receiveQuantities).every(v => v === 0)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isReceiving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <PackageCheck className="h-4 w-4 mr-2" />
+                )}
+                Confirm Receipt
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* ========== CONFIRM DIALOGS ========== */}
+        <ConfirmDialog
+          isOpen={!!cancelConfirmId}
+          onClose={() => setCancelConfirmId(null)}
+          onConfirm={() => cancelConfirmId && handleCancelPO(cancelConfirmId)}
+          title="Cancel Purchase Order?"
+          message="This will cancel the purchase order. You won't be able to receive stock against it."
+          confirmText="Cancel Order"
+        />
+
+        <ConfirmDialog
+          isOpen={!!deleteConfirmId}
+          onClose={() => setDeleteConfirmId(null)}
+          onConfirm={() => deleteConfirmId && handleDeletePO(deleteConfirmId)}
+          title="Delete Purchase Order?"
+          message="This will permanently delete this draft purchase order. This cannot be undone."
+          confirmText="Delete"
+        />
       </div>
     </DashboardLayout>
   );
