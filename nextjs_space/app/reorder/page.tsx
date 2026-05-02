@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api-client';
-import { Download, AlertTriangle, Package, Truck, Loader2, RefreshCw } from 'lucide-react';
+import { useCurrency } from '@/contexts/currency-context';
+import { Download, AlertTriangle, Package, Truck, Loader2, RefreshCw, ShoppingBag, Send, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface ReorderItem {
@@ -25,9 +27,13 @@ interface ReorderItem {
 }
 
 export default function ReorderPage() {
+  const router = useRouter();
+  const { formatPrice } = useCurrency();
   const [items, setItems] = useState<ReorderItem[]>([]);
   const [reorderQuantities, setReorderQuantities] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [generatingPO, setGeneratingPO] = useState<string | null>(null); // supplier name being generated
+  const [generatedPOs, setGeneratedPOs] = useState<Set<string>>(new Set()); // supplier names already generated
 
   const fetchReorderItems = useCallback(async () => {
     setIsLoading(true);
@@ -117,6 +123,93 @@ export default function ReorderPage() {
     toast.success('Reorder list exported successfully');
   };
 
+  // Generate a PO for a specific supplier group
+  const generatePOForSupplier = async (supplierName: string, supplierItems: ReorderItem[]) => {
+    const supplierId = supplierItems[0]?.product?.supplier?.id;
+    if (!supplierId || supplierName === 'No Supplier') {
+      toast.error('Cannot create PO — products have no supplier assigned');
+      return;
+    }
+
+    const poItems = supplierItems
+      .filter(item => (reorderQuantities?.[item.id] || 0) > 0)
+      .map(item => ({
+        productId: item.product.id,
+        quantityOrdered: reorderQuantities?.[item.id] || item.reorderQty,
+        unitPrice: item.product.price || undefined,
+      }));
+
+    if (poItems.length === 0) {
+      toast.error('No items with quantity > 0 to order');
+      return;
+    }
+
+    setGeneratingPO(supplierName);
+    try {
+      await apiClient.createPurchaseOrder({
+        supplierId,
+        items: poItems,
+        notes: `Auto-generated from low stock reorder list`,
+      });
+      setGeneratedPOs(prev => new Set([...prev, supplierName]));
+      toast.success(`Purchase order created for ${supplierName}`);
+    } catch (err: any) {
+      toast.error(err?.message || `Failed to create PO for ${supplierName}`);
+    } finally {
+      setGeneratingPO(null);
+    }
+  };
+
+  // Generate POs for ALL supplier groups
+  const generateAllPOs = async () => {
+    const supplierGroups = Object.entries(groupedBySupplier).filter(
+      ([name]) => name !== 'No Supplier' && !generatedPOs.has(name)
+    );
+
+    if (supplierGroups.length === 0) {
+      toast.error('No supplier groups to generate POs for');
+      return;
+    }
+
+    setGeneratingPO('__all__');
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const [supplierName, supplierItems] of supplierGroups) {
+      const supplierId = supplierItems[0]?.product?.supplier?.id;
+      if (!supplierId) {
+        failCount++;
+        continue;
+      }
+
+      const poItems = supplierItems
+        .filter(item => (reorderQuantities?.[item.id] || 0) > 0)
+        .map(item => ({
+          productId: item.product.id,
+          quantityOrdered: reorderQuantities?.[item.id] || item.reorderQty,
+          unitPrice: item.product.price || undefined,
+        }));
+
+      if (poItems.length === 0) continue;
+
+      try {
+        await apiClient.createPurchaseOrder({
+          supplierId,
+          items: poItems,
+          notes: `Auto-generated from low stock reorder list`,
+        });
+        setGeneratedPOs(prev => new Set([...prev, supplierName]));
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+
+    setGeneratingPO(null);
+    if (successCount > 0) toast.success(`${successCount} purchase order${successCount > 1 ? 's' : ''} created`);
+    if (failCount > 0) toast.error(`${failCount} PO${failCount > 1 ? 's' : ''} failed`);
+  };
+
   const totalItems = items?.length || 0;
   const totalValue = items?.reduce((sum, item) => {
     const qty = reorderQuantities?.[item?.id] || 0;
@@ -131,15 +224,33 @@ export default function ReorderPage() {
             <h1 className="text-2xl font-bold text-gray-900">Reorder Management</h1>
             <p className="text-gray-500">Products below minimum stock level</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={fetchReorderItems}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button onClick={exportToCSV} disabled={items?.length === 0}>
+            <Button variant="outline" onClick={exportToCSV} disabled={items?.length === 0}>
               <Download className="h-4 w-4 mr-2" />
-              Export to CSV
+              Export CSV
             </Button>
+            <Button
+              onClick={generateAllPOs}
+              disabled={items?.length === 0 || generatingPO !== null}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {generatingPO === '__all__' ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <ShoppingBag className="h-4 w-4 mr-2" />
+              )}
+              Generate All POs
+            </Button>
+            {generatedPOs.size > 0 && (
+              <Button variant="outline" onClick={() => router.push('/purchase-orders')}>
+                <ShoppingBag className="h-4 w-4 mr-2" />
+                View POs ({generatedPOs.size})
+              </Button>
+            )}
           </div>
         </div>
 
@@ -179,7 +290,7 @@ export default function ReorderPage() {
                 <div>
                   <p className="text-sm text-gray-500">Estimated Total</p>
                   <p className="text-3xl font-bold text-green-600">
-                    ${totalValue?.toLocaleString?.(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                    {formatPrice(totalValue)}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -211,13 +322,37 @@ export default function ReorderPage() {
           Object.entries(groupedBySupplier)?.map(([supplierName, supplierItems]) => (
             <Card key={supplierName}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-green-600" />
-                  {supplierName}
-                  <Badge variant="info" className="ml-2">
-                    {supplierItems?.length || 0} items
-                  </Badge>
-                </CardTitle>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <CardTitle className="flex items-center gap-2">
+                    <Truck className="h-5 w-5 text-green-600" />
+                    {supplierName}
+                    <Badge variant="info" className="ml-2">
+                      {supplierItems?.length || 0} items
+                    </Badge>
+                  </CardTitle>
+                  {supplierName !== 'No Supplier' && (
+                    generatedPOs.has(supplierName) ? (
+                      <span className="inline-flex items-center gap-1.5 text-sm text-green-600 font-medium">
+                        <CheckCircle2 className="h-4 w-4" />
+                        PO Created
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => generatePOForSupplier(supplierName, supplierItems)}
+                        disabled={generatingPO !== null}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {generatingPO === supplierName ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Send to PO
+                      </Button>
+                    )
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -265,10 +400,10 @@ export default function ReorderPage() {
                               />
                             </td>
                             <td className="px-4 py-3 text-right text-gray-600">
-                              ${(item?.product?.price || 0)?.toFixed?.(2)}
+                              {formatPrice(item?.product?.price || 0)}
                             </td>
                             <td className="px-4 py-3 text-right font-medium text-gray-900">
-                              ${total?.toFixed?.(2) || '0.00'}
+                              {formatPrice(total)}
                             </td>
                           </tr>
                         );
@@ -279,11 +414,10 @@ export default function ReorderPage() {
                         <td colSpan={5}></td>
                         <td className="px-4 py-3 text-right font-medium text-gray-600">Subtotal:</td>
                         <td className="px-4 py-3 text-right font-bold text-gray-900">
-                          ${
+                          {formatPrice(
                             supplierItems
-                              ?.reduce((sum, item) => sum + (reorderQuantities?.[item?.id] || 0) * (item?.product?.price || 0), 0)
-                              ?.toFixed?.(2) || '0.00'
-                          }
+                              ?.reduce((sum, item) => sum + (reorderQuantities?.[item?.id] || 0) * (item?.product?.price || 0), 0) || 0
+                          )}
                         </td>
                       </tr>
                     </tfoot>
