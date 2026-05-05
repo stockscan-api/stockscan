@@ -9,13 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { useCurrency, CURRENCIES, Currency } from '@/contexts/currency-context';
 import { useAuth } from '@/contexts/auth-context';
 import Image from 'next/image';
+import { Input } from '@/components/ui/input';
+import { apiClient } from '@/lib/api-client';
 import {
   Settings, Globe, Check, Link2, Unlink, ExternalLink, Loader2,
-  Shield, Zap, Clock, CheckCircle2, AlertCircle, ArrowRight
+  Shield, Zap, Clock, CheckCircle2, AlertCircle, ArrowRight, Lock, Eye, EyeOff
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-type SettingsTab = 'currency' | 'integrations';
+type SettingsTab = 'currency' | 'password' | 'integrations';
 
 interface IntegrationStatus {
   xero: { connected: boolean; tenantName?: string; connectedAt?: string };
@@ -72,6 +74,15 @@ export default function SettingsPage() {
   });
   const [loadingIntegrations, setLoadingIntegrations] = useState(false);
   const [connectingId, setConnectingId] = useState<string | null>(null);
+
+  // Password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const filteredCurrencies = CURRENCIES.filter(
     c =>
@@ -168,8 +179,51 @@ export default function SettingsPage() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword.trim() || !newPassword.trim()) {
+      toast.error('Please fill in all password fields');
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (currentPassword === newPassword) {
+      toast.error('New password must be different from current password');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await apiClient.changePassword(currentPassword, newPassword);
+      toast.success('Password changed successfully!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+    } catch (err: any) {
+      const message = err?.message || 'Failed to change password';
+      if (message.toLowerCase().includes('current password') || message.toLowerCase().includes('incorrect')) {
+        toast.error('Current password is incorrect');
+      } else if (message.toLowerCase().includes('forbidden') || message.toLowerCase().includes('disabled')) {
+        toast.error('Password changes are disabled for this account');
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'currency', label: 'Currency', icon: <Globe className="h-4 w-4" /> },
+    { id: 'password', label: 'Password', icon: <Lock className="h-4 w-4" /> },
     { id: 'integrations', label: 'Integrations', icon: <Link2 className="h-4 w-4" /> },
   ];
 
@@ -281,6 +335,140 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Password Tab */}
+        {activeTab === 'password' && (
+          <div className="max-w-lg">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lock className="h-5 w-5" />
+                  Change Password
+                </CardTitle>
+                <CardDescription>
+                  Update your account password. You&apos;ll need your current password to make changes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleChangePassword} className="space-y-5">
+                  {/* Current Password */}
+                  <div className="space-y-2">
+                    <Label htmlFor="currentPassword">Current Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="currentPassword"
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Enter your current password"
+                        required
+                        disabled={changingPassword}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        tabIndex={-1}
+                      >
+                        {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* New Password */}
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword">New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="newPassword"
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Enter new password (min. 6 characters)"
+                        required
+                        disabled={changingPassword}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        tabIndex={-1}
+                      >
+                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {newPassword && newPassword.length < 6 && (
+                      <p className="text-xs text-red-500">Password must be at least 6 characters</p>
+                    )}
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Re-enter your new password"
+                        required
+                        disabled={changingPassword}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {confirmPassword && newPassword !== confirmPassword && (
+                      <p className="text-xs text-red-500">Passwords do not match</p>
+                    )}
+                    {confirmPassword && newPassword === confirmPassword && confirmPassword.length >= 6 && (
+                      <p className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> Passwords match
+                      </p>
+                    )}
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword || newPassword.length < 6}
+                    className="w-full"
+                  >
+                    {changingPassword ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Changing Password...
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="h-4 w-4 mr-2" />
+                        Change Password
+                      </>
+                    )}
+                  </Button>
+                </form>
+
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                    <Shield className="h-4 w-4 text-blue-500" />
+                    Password Tips
+                  </h4>
+                  <ul className="text-xs text-gray-500 space-y-1.5">
+                    <li>• Use at least 6 characters</li>
+                    <li>• Mix uppercase and lowercase letters</li>
+                    <li>• Include numbers and special characters</li>
+                    <li>• Don&apos;t reuse passwords from other accounts</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Integrations Tab */}

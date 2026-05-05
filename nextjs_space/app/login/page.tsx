@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, HelpCircle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -130,6 +131,15 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                Forgot Password?
+              </button>
+            </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
@@ -146,6 +156,45 @@ export default function LoginPage() {
             <span>·</span>
             <a href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</a>
           </div>
+
+          {/* Forgot Password Modal */}
+          {showForgotPassword && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
+                <button
+                  onClick={() => setShowForgotPassword(false)}
+                  className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+                <div className="text-center mb-4">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
+                    <HelpCircle className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">Forgot Your Password?</h3>
+                </div>
+                <div className="space-y-3 text-sm text-gray-600">
+                  <p>
+                    To reset your password, please contact your account administrator or company owner. They can assist you with regaining access to your account.
+                  </p>
+                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                    <p className="text-blue-800 font-medium text-xs">
+                      💡 Once logged in, you can change your password anytime from <span className="font-semibold">Settings → Password</span>.
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    A self-service password reset feature is coming soon.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setShowForgotPassword(false)}
+                  className="w-full mt-5"
+                >
+                  Got it
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
