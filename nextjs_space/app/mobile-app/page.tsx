@@ -60,8 +60,81 @@ export default function MobileAppPage() {
 
   const changelog = [
     {
+      version: 'v1.14.0',
+      date: 'May 5, 2026',
+      changes: [
+        'Added "Forgot Password?" option on the login screen',
+        'Users receive a 6-digit reset code via email',
+        'New Reset Password screen to enter code and set a new password',
+        'Codes expire after 30 minutes for security'
+      ]
+    },
+    {
+      version: 'v1.13.19',
+      date: 'May 5, 2026',
+      changes: [
+        'Warning banner on Add Product screen can now be dismissed with an X button',
+        'Dismiss choice persists across sessions'
+      ]
+    },
+    {
+      version: 'v1.13.18',
+      date: 'May 5, 2026',
+      changes: [
+        'Added amber warning banner when adding a product with no default warehouse configured'
+      ]
+    },
+    {
+      version: 'v1.13.17',
+      date: 'May 5, 2026',
+      changes: [
+        'Fixed clipped text on status chips (Pending, Completed, etc.) across multiple screens'
+      ]
+    },
+    {
+      version: 'v1.13.16',
+      date: 'May 5, 2026',
+      changes: [
+        'Fixed 404 error when creating a new warehouse'
+      ]
+    },
+    {
+      version: 'v1.13.15',
+      date: 'May 5, 2026',
+      changes: [
+        'Clearer error message when signing up with an already registered email'
+      ]
+    },
+    {
+      version: 'v1.13.14',
+      date: 'May 4, 2026',
+      changes: [
+        'Fixed signup flow not accepting license keys from the admin panel'
+      ]
+    },
+    {
+      version: 'v1.13.13',
+      date: 'May 2, 2026',
+      changes: [
+        'Code generation/deletion restricted to SUPER_ADMIN only'
+      ]
+    },
+    {
+      version: 'v1.13.12',
+      date: 'May 2, 2026',
+      changes: [
+        'Both legacy product codes and new license keys now work for signup'
+      ]
+    },
+    {
+      version: 'v1.13.11',
+      date: 'May 2, 2026',
+      changes: [
+        'Fixed server error when accessing product codes endpoints'
+      ]
+    },
+    {
       version: 'v1.2.3',
-      build: 'Build 13',
       date: 'February 23, 2026',
       changes: [
         'Fixed Admin Panel Quick Actions layout',
@@ -71,7 +144,6 @@ export default function MobileAppPage() {
     },
     {
       version: 'v1.2.2',
-      build: 'Build 12',
       date: 'February 23, 2026',
       changes: [
         'Fixed product code generation validation',
@@ -81,7 +153,6 @@ export default function MobileAppPage() {
     },
     {
       version: 'v1.2.1',
-      build: 'Build 11',
       date: 'February 23, 2026',
       changes: [
         'Fixed iOS barcode scanner compatibility',
@@ -91,7 +162,6 @@ export default function MobileAppPage() {
     },
     {
       version: 'v1.2.0',
-      build: 'Build 10',
       date: 'February 23, 2026',
       changes: [
         'Production backend configuration',
@@ -125,7 +195,7 @@ export default function MobileAppPage() {
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium flex items-center gap-1">
               <CheckCircle2 className="h-4 w-4" />
-              v1.2.3 (Build 13)
+              v1.14.0 — Password Reset
             </span>
           </div>
         </div>
@@ -296,7 +366,6 @@ export default function MobileAppPage() {
                   <span className={`font-semibold ${index === 0 ? 'text-green-600' : 'text-gray-900'}`}>
                     {release.version}
                   </span>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{release.build}</span>
                   {index === 0 && (
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Latest</span>
                   )}
