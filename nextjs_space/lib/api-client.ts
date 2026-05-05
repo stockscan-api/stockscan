@@ -261,6 +261,20 @@ class ApiClient {
     });
   }
 
+  async forgotPassword(email: string) {
+    return this.request<any>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    return this.request<any>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    });
+  }
+
   // Dashboard
   async getDashboardStats() {
     return this.request<any>('/api/dashboard/stats');

@@ -7,8 +7,9 @@ import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Eye, EyeOff, Loader2, HelpCircle, X } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, KeyRound, ShieldCheck, ArrowLeft, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { apiClient } from '@/lib/api-client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,7 +19,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  // Password reset flow states
+  const [resetStep, setResetStep] = useState<'idle' | 'email' | 'code' | 'success'>('idle');
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -34,6 +42,60 @@ export default function LoginPage() {
       return () => clearTimeout(fallbackTimer);
     }
   }, [isAuthenticated, authLoading, isSuperAdmin, router]);
+
+  const handleRequestResetCode = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!resetEmail.trim()) {
+      toast.error('Please enter your email address');
+      return;
+    }
+    setIsResetting(true);
+    try {
+      await apiClient.forgotPassword(resetEmail.trim());
+      toast.success('Reset code sent to your email');
+      setResetStep('code');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to send reset code. Please try again.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetCode.trim()) {
+      toast.error('Please enter the reset code');
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setIsResetting(true);
+    try {
+      await apiClient.resetPassword(resetCode.trim(), newPassword);
+      toast.success('Password reset successfully!');
+      setResetStep('success');
+    } catch (err: any) {
+      toast.error(err?.message || 'Invalid or expired reset code. Please try again.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const closeResetModal = () => {
+    setResetStep('idle');
+    setResetEmail('');
+    setResetCode('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setShowNewPassword(false);
+    setIsResetting(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,7 +196,7 @@ export default function LoginPage() {
             <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => setShowForgotPassword(true)}
+                onClick={() => setResetStep('email')}
                 className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
               >
                 Forgot Password?
@@ -157,41 +219,190 @@ export default function LoginPage() {
             <a href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</a>
           </div>
 
-          {/* Forgot Password Modal */}
-          {showForgotPassword && (
+          {/* Password Reset Modal */}
+          {resetStep !== 'idle' && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative">
                 <button
-                  onClick={() => setShowForgotPassword(false)}
+                  onClick={closeResetModal}
                   className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
                 >
                   <X className="h-5 w-5" />
                 </button>
-                <div className="text-center mb-4">
-                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
-                    <HelpCircle className="h-6 w-6 text-blue-600" />
+
+                {/* Step 1: Enter email */}
+                {resetStep === 'email' && (
+                  <form onSubmit={handleRequestResetCode}>
+                    <div className="text-center mb-5">
+                      <div className="mx-auto w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
+                        <Mail className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Reset Your Password</h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Enter your email and we&apos;ll send you a reset code
+                      </p>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label htmlFor="reset-email" className="text-sm font-medium text-gray-700">
+                          Email Address
+                        </label>
+                        <Input
+                          id="reset-email"
+                          type="email"
+                          placeholder="you@example.com"
+                          value={resetEmail}
+                          onChange={(e) => setResetEmail(e.target.value)}
+                          required
+                          disabled={isResetting}
+                          autoFocus
+                        />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={isResetting}>
+                        {isResetting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Sending code...
+                          </>
+                        ) : (
+                          'Send Reset Code'
+                        )}
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={closeResetModal}
+                        className="w-full text-sm text-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <ArrowLeft className="h-3.5 w-3.5" />
+                        Back to login
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Step 2: Enter code + new password */}
+                {resetStep === 'code' && (
+                  <form onSubmit={handleResetPassword}>
+                    <div className="text-center mb-5">
+                      <div className="mx-auto w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mb-3">
+                        <KeyRound className="h-6 w-6 text-amber-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Enter Reset Code</h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Check your email for a 6-digit code sent to <span className="font-medium text-gray-700">{resetEmail}</span>
+                      </p>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label htmlFor="reset-code" className="text-sm font-medium text-gray-700">
+                          Reset Code
+                        </label>
+                        <Input
+                          id="reset-code"
+                          type="text"
+                          placeholder="Enter 6-digit code"
+                          value={resetCode}
+                          onChange={(e) => setResetCode(e.target.value)}
+                          required
+                          disabled={isResetting}
+                          autoFocus
+                          maxLength={10}
+                          className="text-center text-lg tracking-widest font-mono"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="new-password" className="text-sm font-medium text-gray-700">
+                          New Password
+                        </label>
+                        <div className="relative">
+                          <Input
+                            id="new-password"
+                            type={showNewPassword ? 'text' : 'password'}
+                            placeholder="Min. 6 characters"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            required
+                            disabled={isResetting}
+                            minLength={6}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="confirm-new-password" className="text-sm font-medium text-gray-700">
+                          Confirm New Password
+                        </label>
+                        <Input
+                          id="confirm-new-password"
+                          type={showNewPassword ? 'text' : 'password'}
+                          placeholder="Re-enter new password"
+                          value={confirmNewPassword}
+                          onChange={(e) => setConfirmNewPassword(e.target.value)}
+                          required
+                          disabled={isResetting}
+                          minLength={6}
+                        />
+                      </div>
+                      <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                        <p className="text-blue-800 text-xs">
+                          💡 Reset codes expire after 30 minutes. If you didn&apos;t receive the email, check your spam folder.
+                        </p>
+                      </div>
+                      <Button type="submit" className="w-full" disabled={isResetting}>
+                        {isResetting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Resetting password...
+                          </>
+                        ) : (
+                          'Reset Password'
+                        )}
+                      </Button>
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => setResetStep('email')}
+                          className="text-sm text-gray-500 hover:text-gray-700 transition-colors flex items-center gap-1"
+                        >
+                          <ArrowLeft className="h-3.5 w-3.5" />
+                          Change email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleRequestResetCode}
+                          disabled={isResetting}
+                          className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          Resend code
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )}
+
+                {/* Step 3: Success */}
+                {resetStep === 'success' && (
+                  <div>
+                    <div className="text-center mb-5">
+                      <div className="mx-auto w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mb-3">
+                        <ShieldCheck className="h-6 w-6 text-green-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Password Reset</h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Your password has been successfully reset. You can now sign in with your new password.
+                      </p>
+                    </div>
+                    <Button onClick={closeResetModal} className="w-full">
+                      Back to Login
+                    </Button>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900">Forgot Your Password?</h3>
-                </div>
-                <div className="space-y-3 text-sm text-gray-600">
-                  <p>
-                    To reset your password, please contact your account administrator or company owner. They can assist you with regaining access to your account.
-                  </p>
-                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-                    <p className="text-blue-800 font-medium text-xs">
-                      💡 Once logged in, you can change your password anytime from <span className="font-semibold">Settings → Password</span>.
-                    </p>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    A self-service password reset feature is coming soon.
-                  </p>
-                </div>
-                <Button
-                  onClick={() => setShowForgotPassword(false)}
-                  className="w-full mt-5"
-                >
-                  Got it
-                </Button>
+                )}
               </div>
             </div>
           )}

@@ -2,6 +2,7 @@
 
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { useAuth } from '@/contexts/auth-context';
+import Link from 'next/link';
 import {
   Smartphone,
   Download,
@@ -19,8 +20,14 @@ import {
   Layers,
   Zap,
   Lock,
-  Wifi
+  Wifi,
+  ArrowRight,
+  Sparkles,
+  Bug,
+  Rocket,
+  Tag
 } from 'lucide-react';
+import { changelogData } from '@/lib/changelog-data';
 
 export default function MobileAppPage() {
   const { user } = useAuth();
@@ -58,118 +65,19 @@ export default function MobileAppPage() {
     }
   ];
 
-  const changelog = [
-    {
-      version: 'v1.14.0',
-      date: 'May 5, 2026',
-      changes: [
-        'Added "Forgot Password?" option on the login screen',
-        'Users receive a 6-digit reset code via email',
-        'New Reset Password screen to enter code and set a new password',
-        'Codes expire after 30 minutes for security'
-      ]
-    },
-    {
-      version: 'v1.13.19',
-      date: 'May 5, 2026',
-      changes: [
-        'Warning banner on Add Product screen can now be dismissed with an X button',
-        'Dismiss choice persists across sessions'
-      ]
-    },
-    {
-      version: 'v1.13.18',
-      date: 'May 5, 2026',
-      changes: [
-        'Added amber warning banner when adding a product with no default warehouse configured'
-      ]
-    },
-    {
-      version: 'v1.13.17',
-      date: 'May 5, 2026',
-      changes: [
-        'Fixed clipped text on status chips (Pending, Completed, etc.) across multiple screens'
-      ]
-    },
-    {
-      version: 'v1.13.16',
-      date: 'May 5, 2026',
-      changes: [
-        'Fixed 404 error when creating a new warehouse'
-      ]
-    },
-    {
-      version: 'v1.13.15',
-      date: 'May 5, 2026',
-      changes: [
-        'Clearer error message when signing up with an already registered email'
-      ]
-    },
-    {
-      version: 'v1.13.14',
-      date: 'May 4, 2026',
-      changes: [
-        'Fixed signup flow not accepting license keys from the admin panel'
-      ]
-    },
-    {
-      version: 'v1.13.13',
-      date: 'May 2, 2026',
-      changes: [
-        'Code generation/deletion restricted to SUPER_ADMIN only'
-      ]
-    },
-    {
-      version: 'v1.13.12',
-      date: 'May 2, 2026',
-      changes: [
-        'Both legacy product codes and new license keys now work for signup'
-      ]
-    },
-    {
-      version: 'v1.13.11',
-      date: 'May 2, 2026',
-      changes: [
-        'Fixed server error when accessing product codes endpoints'
-      ]
-    },
-    {
-      version: 'v1.2.3',
-      date: 'February 23, 2026',
-      changes: [
-        'Fixed Admin Panel Quick Actions layout',
-        'Improved button visibility and responsiveness',
-        'All 6 quick action buttons now visible and functional'
-      ]
-    },
-    {
-      version: 'v1.2.2',
-      date: 'February 23, 2026',
-      changes: [
-        'Fixed product code generation validation',
-        'Added proper DTO validation decorators',
-        'Super Admin can now successfully generate product codes'
-      ]
-    },
-    {
-      version: 'v1.2.1',
-      date: 'February 23, 2026',
-      changes: [
-        'Fixed iOS barcode scanner compatibility',
-        'Migrated from expo-barcode-scanner to expo-camera',
-        'Added support for multiple barcode formats'
-      ]
-    },
-    {
-      version: 'v1.2.0',
-      date: 'February 23, 2026',
-      changes: [
-        'Production backend configuration',
-        'Prepared for TestFlight deployment',
-        'Updated environment variables for production'
-      ]
-    }
-  ];
+  // Get the latest 5 entries from the shared changelog data
+  const recentChangelog = changelogData
+    .flatMap((group) => group.entries)
+    .slice(0, 5);
+
+  const totalEntries = changelogData.reduce((sum, group) => sum + group.entries.length, 0);
+
+  const typeConfig: Record<string, { label: string; color: string; icon: any }> = {
+    feature: { label: 'Feature', color: 'bg-green-100 text-green-700', icon: Sparkles },
+    fix: { label: 'Bug Fix', color: 'bg-amber-100 text-amber-700', icon: Bug },
+    major: { label: 'Major', color: 'bg-indigo-100 text-indigo-700', icon: Rocket },
+    improvement: { label: 'Improvement', color: 'bg-blue-100 text-blue-700', icon: Tag },
+  };
 
   const techStack = [
     { name: 'React Native', description: 'Cross-platform mobile framework' },
@@ -353,31 +261,58 @@ export default function MobileAppPage() {
           </div>
         </div>
 
-        {/* Version History */}
+        {/* Recent Version History */}
         <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <RefreshCw className="h-5 w-5 text-blue-500" />
-            Version History
-          </h2>
-          <div className="space-y-4">
-            {changelog.map((release, index) => (
-              <div key={index} className={`border-l-2 pl-4 ${index === 0 ? 'border-green-500' : 'border-gray-200'}`}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`font-semibold ${index === 0 ? 'text-green-600' : 'text-gray-900'}`}>
-                    {release.version}
-                  </span>
-                  {index === 0 && (
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Latest</span>
-                  )}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-blue-500" />
+              Recent Updates
+            </h2>
+            <Link
+              href="/changelog"
+              className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+            >
+              View all {totalEntries} releases
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {recentChangelog.map((entry, index) => {
+              const config = typeConfig[entry.type] || typeConfig.fix;
+              const Icon = config.icon;
+              return (
+                <div key={entry.version} className={`border-l-2 pl-4 ${index === 0 ? 'border-green-500' : 'border-gray-200'}`}>
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className={`font-semibold ${index === 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                      {entry.version}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${config.color}`}>
+                      <Icon className="h-3 w-3" />
+                      {config.label}
+                    </span>
+                    {index === 0 && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Latest</span>
+                    )}
+                  </div>
+                  <h4 className="font-medium text-gray-800 text-sm mb-1">{entry.title}</h4>
+                  <p className="text-xs text-gray-500 mb-1.5">{entry.date}</p>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    {entry.changes.map((change, i) => (
+                      <li key={i}>• {change}</li>
+                    ))}
+                  </ul>
                 </div>
-                <p className="text-xs text-gray-500 mb-2">{release.date}</p>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  {release.changes.map((change, i) => (
-                    <li key={i}>• {change}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+          <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+            <Link
+              href="/changelog"
+              className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors"
+            >
+              See full version history
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
 
