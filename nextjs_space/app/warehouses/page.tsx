@@ -87,6 +87,12 @@ export default function WarehousesPage() {
   const [stockLoading, setStockLoading] = useState(false);
   const [stockSearch, setStockSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [isAddStockOpen, setIsAddStockOpen] = useState(false);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [addStockForm, setAddStockForm] = useState({ productId: '', quantity: 1 });
+  const [addStockSubmitting, setAddStockSubmitting] = useState(false);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
 
   useEffect(() => {
     fetchWarehouses();
@@ -170,6 +176,91 @@ export default function WarehousesPage() {
     setIsCreateModalOpen(false);
     setEditingWarehouse(null);
   };
+
+  const openAddStock = async () => {
+    setIsAddStockOpen(true);
+    setAddStockForm({ productId: '', quantity: 1 });
+    setProductSearchQuery('');
+    if (allProducts.length === 0) {
+      try {
+        setProductsLoading(true);
+        const res = await apiClient.getProducts({ limit: 500 });
+        const list = Array.isArray(res) ? res : res?.data || res?.products || [];
+        setAllProducts(list);
+      } catch (err) {
+        console.error('Failed to fetch products:', err);
+        toast.error('Failed to load products');
+      } finally {
+        setProductsLoading(false);
+      }
+    }
+  };
+
+  const handleAddStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addStockForm.productId) {
+      toast.error('Please select a product');
+      return;
+    }
+    if (addStockForm.quantity < 1) {
+      toast.error('Quantity must be at least 1');
+      return;
+    }
+    if (!selectedWarehouse || !selectedWh) return;
+
+    try {
+      setAddStockSubmitting(true);
+      // Step 1: Create stock transfer from General Stock to this warehouse
+      const transfer = await apiClient.createStockTransfer({
+        fromLocation: 'General Stock',
+        toLocation: selectedWh.name,
+        toWarehouseId: selectedWarehouse,
+        items: [{ productId: addStockForm.productId, quantity: addStockForm.quantity }],
+        notes: `Add stock to ${selectedWh.name} via warehouse management`,
+      });
+
+      const transferId = transfer?.id;
+      if (!transferId) {
+        toast.error('Failed to create stock transfer');
+        return;
+      }
+
+      // Step 2: Get the transfer item ID from the response
+      const transferItems = transfer?.items || [];
+      const completionItems = transferItems.map((item: any) => ({
+        itemId: item.id,
+        quantityTransferred: item.quantity || addStockForm.quantity,
+      }));
+
+      // Step 3: Complete the transfer immediately so stock appears
+      await apiClient.updateStockTransferStatus(transferId, {
+        status: 'COMPLETED',
+        items: completionItems,
+      });
+
+      toast.success('Stock added to warehouse successfully');
+      setIsAddStockOpen(false);
+      setAddStockForm({ productId: '', quantity: 1 });
+      // Refresh stock and warehouse data
+      fetchWarehouseStock(selectedWarehouse);
+      fetchWarehouses();
+    } catch (err: any) {
+      console.error('Failed to add stock:', err);
+      toast.error(err?.message || 'Failed to add stock to warehouse');
+    } finally {
+      setAddStockSubmitting(false);
+    }
+  };
+
+  const filteredProducts = allProducts.filter(p => {
+    if (!productSearchQuery) return true;
+    const q = productSearchQuery.toLowerCase();
+    return (
+      p.name?.toLowerCase().includes(q) ||
+      p.sku?.toLowerCase().includes(q) ||
+      p.category?.toLowerCase().includes(q)
+    );
+  });
 
   const openEdit = (wh: WarehouseData) => {
     setEditingWarehouse(wh);
@@ -483,6 +574,10 @@ export default function WarehousesPage() {
                           className="pl-9 w-64"
                         />
                       </div>
+                      <Button size="sm" onClick={openAddStock}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Stock
+                      </Button>
                       <button
                         onClick={() => { setSelectedWarehouse(null); setWarehouseStock([]); setStockSearch(''); }}
                         className="text-gray-400 hover:text-gray-600"
@@ -719,6 +814,108 @@ export default function WarehousesPage() {
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 {editingWarehouse ? 'Update' : 'Create'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Add Stock to Warehouse Modal */}
+        <Modal
+          isOpen={isAddStockOpen}
+          onClose={() => { setIsAddStockOpen(false); setAddStockForm({ productId: '', quantity: 1 }); setProductSearchQuery(''); }}
+          title={`Add Stock to ${selectedWh?.name || 'Warehouse'}`}
+        >
+          <form onSubmit={handleAddStock} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Product *</label>
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search products by name, SKU, or category..."
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {productsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                  <span className="ml-2 text-sm text-gray-500">Loading products...</span>
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-y-auto border rounded-lg divide-y">
+                  {filteredProducts.length === 0 ? (
+                    <div className="py-6 text-center text-sm text-gray-500">
+                      {productSearchQuery ? 'No products match your search' : 'No products available'}
+                    </div>
+                  ) : (
+                    filteredProducts.map((product) => (
+                      <label
+                        key={product.id}
+                        className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-blue-50 transition-colors ${
+                          addStockForm.productId === product.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="productSelect"
+                          value={product.id}
+                          checked={addStockForm.productId === product.id}
+                          onChange={() => setAddStockForm({ ...addStockForm, productId: product.id })}
+                          className="h-4 w-4 text-blue-600 border-gray-300"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            {product.sku && <span className="font-mono">{product.sku}</span>}
+                            {product.category && (
+                              <Badge variant="outline" className="text-xs py-0">{product.category}</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">
+                          Qty: {product.quantity ?? product.currentStock ?? 0}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+              <Input
+                type="number"
+                min={1}
+                value={addStockForm.quantity}
+                onChange={(e) => setAddStockForm({ ...addStockForm, quantity: parseInt(e.target.value) || 1 })}
+                placeholder="Enter quantity"
+              />
+              <p className="text-xs text-gray-400 mt-1">Number of units to add to this warehouse</p>
+            </div>
+
+            {addStockForm.productId && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>Summary:</strong> Adding {addStockForm.quantity} unit{addStockForm.quantity !== 1 ? 's' : ''} of{' '}
+                  <strong>{allProducts.find(p => p.id === addStockForm.productId)?.name}</strong> to{' '}
+                  <strong>{selectedWh?.name}</strong>
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => { setIsAddStockOpen(false); setAddStockForm({ productId: '', quantity: 1 }); setProductSearchQuery(''); }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addStockSubmitting || !addStockForm.productId}>
+                {addStockSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                Add Stock
               </Button>
             </div>
           </form>

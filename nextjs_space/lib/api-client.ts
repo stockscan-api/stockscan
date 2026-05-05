@@ -961,8 +961,12 @@ class ApiClient {
     return this.request<any>(`/api/stock-transfers${query ? `?${query}` : ''}`);
   }
 
-  async createStockTransfer(data: { fromWarehouseId: string; toWarehouseId: string; items: Array<{ productId: string; quantity: number }> ; notes?: string }) {
+  async createStockTransfer(data: { fromLocation: string; toLocation: string; fromWarehouseId?: string; toWarehouseId?: string; items: Array<{ productId: string; quantity: number }>; notes?: string }) {
     return this.request<any>('/api/stock-transfers', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateStockTransferStatus(id: string, data: { status: string; items?: Array<{ itemId: string; quantityTransferred: number }> }) {
+    return this.request<any>(`/api/stock-transfers/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) });
   }
 
   // ============ STOCKTAKES ============

@@ -156,7 +156,11 @@ export default function StockTransfersPage() {
     }
     try {
       setIsSubmitting(true);
+      const fromWh = warehouses.find((w: any) => w.id === fromWarehouse);
+      const toWh = warehouses.find((w: any) => w.id === toWarehouse);
       await apiClient.createStockTransfer({
+        fromLocation: fromWh?.name || 'Unknown',
+        toLocation: toWh?.name || 'Unknown',
         fromWarehouseId: fromWarehouse,
         toWarehouseId: toWarehouse,
         items: transferItems.map(i => ({ productId: i.productId, quantity: i.quantity })),
