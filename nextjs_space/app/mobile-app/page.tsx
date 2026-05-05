@@ -135,22 +135,23 @@ export default function MobileAppPage() {
           <div className="flex flex-col md:flex-row md:items-center gap-6">
             <div className="flex-1">
               <h2 className="text-xl md:text-2xl font-bold mb-2">Download StockScan Mobile</h2>
-              <p className="text-blue-100 mb-4">Available for iOS and Android devices. Seamlessly sync with your web dashboard.</p>
+              <p className="text-blue-100 mb-4">Available for iOS on the App Store. Seamlessly sync with your web dashboard.</p>
               <div className="flex flex-wrap gap-3">
                 <a
-                  href="#ios"
-                  className="inline-flex items-center gap-2 bg-white text-gray-900 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                  href="https://apps.apple.com/gb/app/stockscan-inventory-management/id6759203556"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-white text-gray-900 px-5 py-2.5 rounded-lg font-medium hover:bg-gray-100 transition-colors"
                 >
                   <Apple className="h-5 w-5" />
-                  iOS (TestFlight)
+                  Download on the App Store
                 </a>
-                <a
-                  href="#android"
-                  className="inline-flex items-center gap-2 bg-white/10 text-white border border-white/30 px-4 py-2.5 rounded-lg font-medium hover:bg-white/20 transition-colors"
+                <div
+                  className="inline-flex items-center gap-2 bg-white/10 text-white/60 border border-white/20 px-5 py-2.5 rounded-lg font-medium cursor-default"
                 >
                   <Play className="h-5 w-5" />
-                  Android (APK)
-                </a>
+                  Android — Coming Soon
+                </div>
               </div>
             </div>
             <div className="hidden md:flex items-center justify-center w-32 h-32 bg-white/10 rounded-2xl">
