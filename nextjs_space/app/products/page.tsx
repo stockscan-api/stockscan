@@ -25,13 +25,13 @@ interface Product {
   price: number;
   unitPrice?: number;
   costPrice?: number;
-  currentStock: number;
-  minimumStock: number;
-  category?: { id: string; name: string };
-  categoryId?: string;
+  quantity: number;
+  reorderThreshold: number;
+  category?: string;
   supplier?: { id: string; name: string };
   supplierId?: string;
   barcode?: string;
+  location?: string;
   isActive: boolean;
 }
 
@@ -41,11 +41,12 @@ interface FormData {
   description: string;
   costPrice: string;
   unitPrice: string;
-  currentStock: string;
-  minimumStock: string;
-  categoryId: string;
+  quantity: string;
+  reorderThreshold: string;
+  category: string;
   supplierId: string;
   barcode: string;
+  location: string;
 }
 
 export default function ProductsPage() {
@@ -78,11 +79,12 @@ export default function ProductsPage() {
     description: '',
     costPrice: '',
     unitPrice: '',
-    currentStock: '',
-    minimumStock: '',
-    categoryId: '',
+    quantity: '',
+    reorderThreshold: '',
+    category: '',
     supplierId: '',
     barcode: '',
+    location: '',
   });
 
   const fetchProducts = useCallback(async () => {
@@ -90,7 +92,7 @@ export default function ProductsPage() {
     try {
       const params: any = { page, limit: 10 };
       if (search) params.search = search;
-      if (filterCategory) params.categoryId = filterCategory;
+      if (filterCategory) params.category = filterCategory;
       if (filterSupplier) params.supplierId = filterSupplier;
       if (filterLowStock) params.lowStock = true;
 
@@ -108,11 +110,14 @@ export default function ProductsPage() {
 
   const fetchFilters = useCallback(async () => {
     try {
-      const [cats, supps] = await Promise.all([
-        apiClient.getCategories().catch(() => []),
+      // Extract unique categories from all products (no separate categories endpoint)
+      const [allProdsResp, supps] = await Promise.all([
+        apiClient.getProducts({ limit: 500 }).catch(() => ({ products: [] })),
         apiClient.getSuppliers({ limit: 100 }).catch(() => ({ data: [] })),
       ]);
-      setCategories(Array.isArray(cats) ? cats : []);
+      const allProds = allProdsResp?.products || allProdsResp?.data || (Array.isArray(allProdsResp) ? allProdsResp : []);
+      const uniqueCategories = [...new Set(allProds.map((p: any) => p.category).filter(Boolean))].sort();
+      setCategories(uniqueCategories);
       setSuppliers(Array.isArray(supps?.data) ? supps.data : Array.isArray(supps) ? supps : []);
     } catch (error) {
       console.error('Failed to fetch filters');
@@ -138,11 +143,12 @@ export default function ProductsPage() {
         description: product?.description || '',
         costPrice: product?.costPrice != null ? String(product.costPrice) : '',
         unitPrice: String(((product?.unitPrice ?? product?.price) || '')),
-        currentStock: String(product?.currentStock || ''),
-        minimumStock: String(product?.minimumStock || ''),
-        categoryId: product?.categoryId || '',
+        quantity: String(product?.quantity ?? ''),
+        reorderThreshold: String(product?.reorderThreshold ?? ''),
+        category: (product as any)?.category || '',
         supplierId: product?.supplierId || '',
         barcode: product?.barcode || '',
+        location: (product as any)?.location || '',
       });
     } else {
       setEditingProduct(null);
@@ -152,11 +158,12 @@ export default function ProductsPage() {
         description: '',
         costPrice: '',
         unitPrice: '',
-        currentStock: '',
-        minimumStock: '',
-        categoryId: '',
+        quantity: '',
+        reorderThreshold: '',
+        category: '',
         supplierId: '',
         barcode: '',
+        location: '',
       });
     }
     setIsModalOpen(true);
@@ -173,11 +180,12 @@ export default function ProductsPage() {
         description: formData.description || undefined,
         unitPrice: parseFloat(formData.unitPrice) || 0,
         costPrice: formData.costPrice ? parseFloat(formData.costPrice) : undefined,
-        currentStock: parseInt(formData.currentStock) || 0,
-        minimumStock: parseInt(formData.minimumStock) || 0,
-        categoryId: formData.categoryId || undefined,
+        quantity: parseInt(formData.quantity) || 0,
+        reorderThreshold: parseInt(formData.reorderThreshold) || 0,
+        category: formData.category || undefined,
         supplierId: formData.supplierId || undefined,
         barcode: formData.barcode || undefined,
+        location: formData.location || undefined,
       };
 
       if (editingProduct) {
@@ -234,7 +242,7 @@ export default function ProductsPage() {
       key: 'category',
       header: 'Category',
       render: (product: Product) => (
-        <span className="text-gray-600">{product?.category?.name || '-'}</span>
+        <span className="text-gray-600">{product?.category || '-'}</span>
       ),
     },
     {
@@ -257,14 +265,14 @@ export default function ProductsPage() {
       key: 'stock',
       header: 'Stock',
       render: (product: Product) => {
-        const isLow = (product?.currentStock || 0) < (product?.minimumStock || 0);
+        const isLow = (product?.quantity || 0) <= (product?.reorderThreshold || 0);
         return (
           <div>
             <Badge variant={isLow ? 'danger' : 'success'}>
-              {product?.currentStock || 0}
+              {product?.quantity ?? 0}
             </Badge>
             {isLow && (
-              <p className="text-xs text-red-500 mt-1">Min: {product?.minimumStock}</p>
+              <p className="text-xs text-red-500 mt-1">Reorder at: {product?.reorderThreshold}</p>
             )}
           </div>
         );
@@ -364,7 +372,7 @@ export default function ProductsPage() {
                 <SelectInput
                   options={[
                     { value: '', label: 'All Categories' },
-                    ...(categories?.map((c) => ({ value: c?.id, label: c?.name })) || []),
+                    ...(categories?.map((c: string) => ({ value: c, label: c })) || []),
                   ]}
                   value={filterCategory}
                   onChange={(e) => {
@@ -438,7 +446,7 @@ export default function ProductsPage() {
                   </div>
                 ) : (
                   products?.map((product) => {
-                    const isLow = (product?.currentStock || 0) < (product?.minimumStock || 0);
+                    const isLow = (product?.quantity || 0) <= (product?.reorderThreshold || 0);
                     return (
                       <Card key={product?.id} className="hover:shadow-md transition-shadow">
                         <CardContent className="p-4">
@@ -447,7 +455,7 @@ export default function ProductsPage() {
                               <Package className="h-6 w-6 text-blue-600" />
                             </div>
                             <Badge variant={isLow ? 'danger' : 'success'}>
-                              Stock: {product?.currentStock}
+                              Stock: {product?.quantity ?? 0}
                             </Badge>
                           </div>
                           <h3 className="font-semibold text-gray-900 mb-1">{product?.name}</h3>
@@ -558,34 +566,49 @@ export default function ProductsPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Current Stock *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
               <Input
                 type="number"
                 min="0"
-                value={formData.currentStock}
-                onChange={(e) => setFormData({ ...formData, currentStock: e.target.value })}
+                step="1"
+                value={formData.quantity}
+                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Stock *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reorder Threshold *</label>
               <Input
                 type="number"
                 min="0"
-                value={formData.minimumStock}
-                onChange={(e) => setFormData({ ...formData, minimumStock: e.target.value })}
+                step="1"
+                value={formData.reorderThreshold}
+                onChange={(e) => setFormData({ ...formData, reorderThreshold: e.target.value })}
                 required
               />
+              <p className="text-xs text-gray-400 mt-1">Alert when stock falls below this level</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <SelectInput
-                options={[
-                  { value: '', label: 'Select Category' },
-                  ...(categories?.map((c) => ({ value: c?.id, label: c?.name })) || []),
-                ]}
-                value={formData.categoryId}
-                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+              <Input
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                list="category-suggestions"
+                placeholder="e.g. Engine Parts"
+                required
+              />
+              <datalist id="category-suggestions">
+                {categories?.map((c, i) => (
+                  <option key={i} value={typeof c === 'string' ? c : c?.name || c} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+              <Input
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="e.g. Aisle 3, Shelf B2"
               />
             </div>
             <div>
