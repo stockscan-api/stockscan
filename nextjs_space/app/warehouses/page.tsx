@@ -103,7 +103,70 @@ export default function WarehousesPage() {
       setIsLoading(true);
       const response = await apiClient.getWarehouses();
       const list = Array.isArray(response) ? response : response?.data || response?.warehouses || [];
-      setWarehouses(list);
+
+      // Try to get overview data which includes stock summaries
+      try {
+        const overview = await apiClient.getWarehousesOverview();
+        const overviewList = Array.isArray(overview) ? overview : overview?.data || overview?.warehouses || [];
+
+        // Merge overview data (which has stockSummary) into the warehouse list
+        if (overviewList.length > 0) {
+          const overviewMap = new Map<string, any>();
+          overviewList.forEach((ow: any) => {
+            if (ow.id) overviewMap.set(ow.id, ow);
+          });
+
+          const enriched = list.map((w: any) => {
+            const ov = overviewMap.get(w.id);
+            if (ov) {
+              return {
+                ...w,
+                stockSummary: ov.stockSummary || w.stockSummary,
+                _count: ov._count || w._count,
+              };
+            }
+            return w;
+          });
+          setWarehouses(enriched);
+          return;
+        }
+      } catch (overviewErr) {
+        console.warn('Overview endpoint not available, computing stock values from stock data');
+      }
+
+      // Fallback: if overview not available, compute stock summary from individual warehouse stock
+      const enrichedList = await Promise.all(
+        list.map(async (w: any) => {
+          if (w.stockSummary?.totalValue) return w;
+          try {
+            const stockResp = await apiClient.getWarehouseStock(w.id, { limit: 500 });
+            const stockItems = Array.isArray(stockResp) ? stockResp : stockResp?.data || stockResp?.stock || stockResp?.warehouseStock || [];
+            let totalQuantity = 0;
+            let totalValue = 0;
+            let lowStockCount = 0;
+            stockItems.forEach((item: any) => {
+              const qty = item.quantity || 0;
+              const price = item.product?.unitPrice ?? item.product?.price ?? 0;
+              const threshold = item.product?.reorderThreshold || 0;
+              totalQuantity += qty;
+              totalValue += qty * price;
+              if (threshold > 0 && qty <= threshold) lowStockCount++;
+            });
+            return {
+              ...w,
+              stockSummary: {
+                totalProducts: stockItems.length,
+                totalQuantity,
+                totalValue,
+                lowStockCount,
+              },
+            };
+          } catch {
+            return w;
+          }
+        })
+      );
+      setWarehouses(enrichedList);
     } catch (err: any) {
       console.error('Failed to fetch warehouses:', err);
       toast.error('Failed to load warehouses');

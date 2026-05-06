@@ -937,6 +937,10 @@ class ApiClient {
     return this.request<any>('/api/warehouses');
   }
 
+  async getWarehousesOverview() {
+    return this.request<any>('/api/warehouses/overview');
+  }
+
   async getWarehouse(id: string) {
     return this.request<any>(`/api/warehouses/${id}`);
   }
