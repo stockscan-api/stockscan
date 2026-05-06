@@ -35,6 +35,7 @@ import {
   Send,
   Ban,
   Warehouse,
+  MapPin,
 } from 'lucide-react';
 
 interface DeliveryItem {
@@ -58,6 +59,7 @@ interface Delivery {
   sourceWarehouse?: { id: string; name: string; code?: string };
   destinationWarehouse?: { id: string; name: string; code?: string };
   stockTransferId?: string;
+  deliveryAddress?: string;
   deliveryDate?: string;
   signatureUrl?: string;
   signedBy?: string;
@@ -94,6 +96,7 @@ export default function DeliveryDetailPage() {
     customerPhone: '',
     sageOrderReference: '',
     deliveryDate: '',
+    deliveryAddress: '',
   });
 
   // Signature/Collect modal
@@ -122,6 +125,7 @@ export default function DeliveryDetailPage() {
         customerPhone: data.customerPhone || '',
         sageOrderReference: data.sageOrderReference || '',
         deliveryDate: data.deliveryDate ? data.deliveryDate.split('T')[0] : '',
+        deliveryAddress: data.deliveryAddress || '',
       });
       setEmailRecipient(data.customerEmail || '');
     } catch (error: any) {
@@ -146,6 +150,7 @@ export default function DeliveryDetailPage() {
         customerPhone: editForm.customerPhone || undefined,
         sageOrderReference: editForm.sageOrderReference || undefined,
         deliveryDate: editForm.deliveryDate || undefined,
+        deliveryAddress: editForm.deliveryAddress || undefined,
       });
       toast.success('Delivery updated');
       setShowEditModal(false);
@@ -453,6 +458,16 @@ export default function DeliveryDetailPage() {
                     </div>
                   )}
                 </div>
+
+                {delivery.deliveryAddress && (
+                  <div className="flex items-start gap-3 pt-2 border-t">
+                    <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-gray-500">Delivery / Collection Address</p>
+                      <p className="font-medium text-gray-900 whitespace-pre-line">{delivery.deliveryAddress}</p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -632,6 +647,19 @@ export default function DeliveryDetailPage() {
                 type="date"
                 value={editForm.deliveryDate}
                 onChange={(e) => setEditForm({ ...editForm, deliveryDate: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <MapPin className="h-4 w-4 inline mr-1" />
+                Delivery / Collection Address
+              </label>
+              <textarea
+                value={editForm.deliveryAddress}
+                onChange={(e) => setEditForm({ ...editForm, deliveryAddress: e.target.value })}
+                placeholder="Enter the delivery or collection address"
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
             </div>
             <div className="flex justify-end gap-3 pt-4">

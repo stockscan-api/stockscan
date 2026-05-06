@@ -621,13 +621,14 @@ class ApiClient {
     return this.request<any>(`/api/deliveries/${id}`);
   }
 
-  // Create delivery (v1.14.1 - supports deliveryType, fulfillmentMethod, warehouse IDs)
+  // Create delivery (v1.14.1 - supports deliveryType, fulfillmentMethod, warehouse IDs, deliveryAddress)
   async createDelivery(data: {
     customerName: string;
     customerEmail?: string;
     customerPhone?: string;
     sageOrderReference?: string;
     deliveryDate?: string;
+    deliveryAddress?: string;
     notes?: string;
     deliveryType?: 'CUSTOMER' | 'TRANSFER';
     fulfillmentMethod?: 'DELIVERY' | 'COLLECTION';
@@ -649,7 +650,7 @@ class ApiClient {
   }
 
   // Create delivery from POS sale (v1.14.1)
-  async createDeliveryFromSale(saleId: string, data?: { fulfillmentMethod?: 'DELIVERY' | 'COLLECTION'; notes?: string }) {
+  async createDeliveryFromSale(saleId: string, data?: { fulfillmentMethod?: 'DELIVERY' | 'COLLECTION'; notes?: string; deliveryAddress?: string }) {
     return this.request<any>(`/api/deliveries/from-sale/${saleId}`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
@@ -657,7 +658,7 @@ class ApiClient {
   }
 
   // Create delivery from stock transfer (v1.14.1)
-  async createDeliveryFromTransfer(transferId: string, data?: { notes?: string; fulfillmentMethod?: string }) {
+  async createDeliveryFromTransfer(transferId: string, data?: { notes?: string; fulfillmentMethod?: string; deliveryAddress?: string }) {
     return this.request<any>(`/api/deliveries/from-transfer/${transferId}`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
@@ -671,6 +672,7 @@ class ApiClient {
     customerPhone?: string;
     sageOrderReference?: string;
     deliveryDate?: string;
+    deliveryAddress?: string;
     fulfillmentMethod?: 'DELIVERY' | 'COLLECTION';
   }) {
     return this.request<any>(`/api/deliveries/${id}`, {
