@@ -77,10 +77,42 @@ export default function DashboardPage() {
       const lowStockCount = extractTotal(lowStockRes, lowStockItems);
 
       const whList = Array.isArray(warehousesRes) ? warehousesRes : warehousesRes?.data || warehousesRes?.warehouses || [];
+
+      // Enrich warehouses with overview data (stock summaries)
+      let enrichedWarehouses = whList;
+      try {
+        const overview = await apiClient.getWarehousesOverview();
+        const overviewList = Array.isArray(overview) ? overview : overview?.data || overview?.warehouses || [];
+        if (overviewList.length > 0) {
+          const overviewMap = new Map<string, any>();
+          overviewList.forEach((ow: any) => {
+            if (ow.id) overviewMap.set(ow.id, ow);
+          });
+          enrichedWarehouses = whList.map((w: any) => {
+            const ov = overviewMap.get(w.id);
+            if (ov) {
+              return {
+                ...w,
+                stockSummary: ov.stockSummary || {
+                  totalProducts: ov.productCount ?? ov.totalProducts ?? 0,
+                  totalQuantity: ov.totalUnits ?? ov.totalQuantity ?? 0,
+                  totalValue: ov.stockValue ?? ov.totalValue ?? 0,
+                  lowStockCount: ov.lowStockCount ?? 0,
+                },
+                _count: ov._count || w._count,
+              };
+            }
+            return w;
+          });
+        }
+      } catch {
+        // Overview not available, use basic warehouse data
+      }
+
       setProducts(allProducts);
       setTransactions(allTransactions);
       setLowStockProducts(lowStockItems);
-      setWarehouses(whList);
+      setWarehouses(enrichedWarehouses);
 
       // Calculate stats using API totals
       const totalValue = allProducts.reduce((sum: number, p: any) => sum + (((p?.unitPrice ?? p?.price ?? 0)) * ((p?.quantity ?? p?.currentStock) || 0)), 0);
