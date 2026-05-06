@@ -138,6 +138,12 @@ export default function PosPage() {
   const [loadingSales, setLoadingSales] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [showRefundModal, setShowRefundModal] = useState(false);
+
+  // Delivery note address modal
+  const [showDeliveryAddressModal, setShowDeliveryAddressModal] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryNoteSaleId, setDeliveryNoteSaleId] = useState<string | null>(null);
+  const [isCreatingDeliveryNote, setIsCreatingDeliveryNote] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [refundingSaleId, setRefundingSaleId] = useState<string | null>(null);
 
@@ -493,13 +499,32 @@ export default function PosPage() {
     setView('history');
   };
 
-  const handleCreateDeliveryNote = async () => {
-    if (!invoiceData) return;
+  // Open the address modal before creating a delivery note
+  const promptDeliveryNote = (saleId: string) => {
+    setDeliveryNoteSaleId(saleId);
+    setDeliveryAddress('');
+    setShowDeliveryAddressModal(true);
+  };
+
+  const confirmCreateDeliveryNote = async () => {
+    if (!deliveryNoteSaleId) return;
+    setIsCreatingDeliveryNote(true);
     try {
-      await apiClient.createDeliveryFromSale(invoiceData.id);
+      await apiClient.createDeliveryFromSale(deliveryNoteSaleId, {
+        deliveryAddress: deliveryAddress.trim() || undefined,
+      });
       toast.success('Delivery note created — view it in Deliveries');
+      setShowDeliveryAddressModal(false);
+      setDeliveryNoteSaleId(null);
+      setDeliveryAddress('');
+      // If this was from the sale history modal, close it too
+      if (selectedSale && selectedSale.id === deliveryNoteSaleId) {
+        setSelectedSale(null);
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to create delivery note');
+    } finally {
+      setIsCreatingDeliveryNote(false);
     }
   };
 
@@ -609,7 +634,7 @@ export default function PosPage() {
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  onClick={handleCreateDeliveryNote}
+                  onClick={() => invoiceData && promptDeliveryNote(invoiceData.id)}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm"
                 >
                   <Truck className="h-4 w-4" />
@@ -1134,20 +1159,62 @@ export default function PosPage() {
                 </button>
                 {/* Create Delivery Note from this sale */}
                 <button
-                  onClick={async () => {
-                    try {
-                      await apiClient.createDeliveryFromSale(selectedSale.id);
-                      toast.success('Delivery note created — view it in Deliveries');
-                      setSelectedSale(null);
-                    } catch (err: any) {
-                      toast.error(err.message || 'Failed to create delivery note');
-                    }
-                  }}
+                  onClick={() => promptDeliveryNote(selectedSale.id)}
                   className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
                 >
                   <Truck className="h-4 w-4" />
                   Create Delivery Note
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delivery Address Modal */}
+        {showDeliveryAddressModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-md w-full p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Create Delivery Note</h2>
+              <p className="text-sm text-gray-500 mb-4">Add a delivery or collection address (optional)</p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Delivery / Collection Address
+                  </label>
+                  <textarea
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    placeholder="Enter the customer's address..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowDeliveryAddressModal(false);
+                      setDeliveryNoteSaleId(null);
+                      setDeliveryAddress('');
+                    }}
+                    disabled={isCreatingDeliveryNote}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmCreateDeliveryNote}
+                    disabled={isCreatingDeliveryNote}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm disabled:opacity-50"
+                  >
+                    {isCreatingDeliveryNote ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Truck className="h-4 w-4" />
+                    )}
+                    {isCreatingDeliveryNote ? 'Creating...' : 'Create Delivery Note'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
