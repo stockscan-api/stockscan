@@ -109,7 +109,8 @@ export default function WarehousesPage() {
         const overview = await apiClient.getWarehousesOverview();
         const overviewList = Array.isArray(overview) ? overview : overview?.data || overview?.warehouses || [];
 
-        // Merge overview data (which has stockSummary) into the warehouse list
+        // Merge overview data into the warehouse list
+        // Overview returns flat fields: productCount, totalUnits, stockValue, lowStockCount
         if (overviewList.length > 0) {
           const overviewMap = new Map<string, any>();
           overviewList.forEach((ow: any) => {
@@ -121,7 +122,12 @@ export default function WarehousesPage() {
             if (ov) {
               return {
                 ...w,
-                stockSummary: ov.stockSummary || w.stockSummary,
+                stockSummary: ov.stockSummary || {
+                  totalProducts: ov.productCount ?? ov.totalProducts ?? 0,
+                  totalQuantity: ov.totalUnits ?? ov.totalQuantity ?? 0,
+                  totalValue: ov.stockValue ?? ov.totalValue ?? 0,
+                  lowStockCount: ov.lowStockCount ?? 0,
+                },
                 _count: ov._count || w._count,
               };
             }
