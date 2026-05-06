@@ -38,24 +38,75 @@ export default function ReorderPage() {
   const fetchReorderItems = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Get all products with low stock
-      const response = await apiClient.getProducts({ lowStock: true, limit: 200 });
-      const lowStockProducts = response?.products || response?.data || (Array.isArray(response) ? response : []);
-      
-      const reorderItems = lowStockProducts?.map((product: any) => {
-        const currentStock = product?.quantity ?? product?.currentStock ?? 0;
-        const minStock = product?.reorderThreshold ?? product?.minimumStock ?? 0;
-        return {
-          id: product?.id,
-          product: {
-            ...product,
-            currentStock,
-            minimumStock: minStock,
-            price: product?.unitPrice ?? product?.price ?? 0,
-          },
-          reorderQty: Math.max(minStock * 2 - currentStock, minStock || 10),
-        };
-      });
+      // First try to get low stock from warehouse stock data (warehouse-aware)
+      let reorderItems: ReorderItem[] = [];
+
+      try {
+        const warehouses = await apiClient.getWarehouses();
+        const warehouseList = Array.isArray(warehouses) ? warehouses : warehouses?.data || warehouses?.warehouses || [];
+
+        // Fetch stock from all warehouses and find low stock items
+        const allLowStock: ReorderItem[] = [];
+        const seenProductIds = new Set<string>();
+
+        for (const wh of warehouseList) {
+          const stockResp = await apiClient.getWarehouseStock(wh.id, { limit: 500 });
+          const stockItems = Array.isArray(stockResp) ? stockResp : stockResp?.data || stockResp?.stock || stockResp?.warehouseStock || [];
+
+          for (const item of stockItems) {
+            const qty = item.quantity || 0;
+            const threshold = item.product?.reorderThreshold || 0;
+            const productId = item.product?.id || item.productId;
+
+            // Include items that are at or below reorder threshold
+            if (threshold > 0 && qty <= threshold && productId && !seenProductIds.has(productId)) {
+              seenProductIds.add(productId);
+              const price = item.product?.unitPrice ?? item.product?.price ?? 0;
+              const reorderQty = Math.max(threshold * 2 - qty, item.product?.reorderQuantity || threshold || 10);
+              allLowStock.push({
+                id: productId,
+                product: {
+                  id: productId,
+                  name: item.product?.name || 'Unknown',
+                  sku: item.product?.sku || '',
+                  price,
+                  currentStock: qty,
+                  minimumStock: threshold,
+                  supplier: item.product?.supplier ? { id: item.product.supplier.id, name: item.product.supplier.name } : undefined,
+                },
+                reorderQty,
+              });
+            }
+          }
+        }
+
+        if (allLowStock.length > 0) {
+          reorderItems = allLowStock;
+        }
+      } catch (whErr) {
+        console.warn('Warehouse stock fetch failed, falling back to products endpoint:', whErr);
+      }
+
+      // Fallback: if no warehouse data, use products endpoint
+      if (reorderItems.length === 0) {
+        const response = await apiClient.getProducts({ lowStock: true, limit: 200 });
+        const lowStockProducts = response?.products || response?.data || (Array.isArray(response) ? response : []);
+
+        reorderItems = lowStockProducts?.map((product: any) => {
+          const currentStock = product?.quantity ?? product?.currentStock ?? 0;
+          const minStock = product?.reorderThreshold ?? product?.minimumStock ?? 0;
+          return {
+            id: product?.id,
+            product: {
+              ...product,
+              currentStock,
+              minimumStock: minStock,
+              price: product?.unitPrice ?? product?.price ?? 0,
+            },
+            reorderQty: Math.max(minStock * 2 - currentStock, product?.reorderQuantity || minStock || 10),
+          };
+        }) || [];
+      }
 
       setItems(reorderItems);
 
