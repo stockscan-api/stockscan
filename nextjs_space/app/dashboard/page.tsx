@@ -109,16 +109,64 @@ export default function DashboardPage() {
         // Overview not available, use basic warehouse data
       }
 
+      // Fetch warehouse-level low stock items (same pattern as reorder page)
+      let warehouseLowStockItems: any[] = [];
+      let warehouseLowStockCount = 0;
+      try {
+        // First try to get count from enriched overview data
+        warehouseLowStockCount = enrichedWarehouses.reduce((sum: number, w: any) => {
+          return sum + (w.stockSummary?.lowStockCount ?? 0);
+        }, 0);
+
+        // Fetch actual low stock items from warehouse stock
+        const seenProductIds = new Set<string>();
+        for (const wh of enrichedWarehouses) {
+          try {
+            const stockResp = await apiClient.getWarehouseStock(wh.id, { limit: 500 });
+            const stockList = Array.isArray(stockResp) ? stockResp : stockResp?.data || stockResp?.stock || stockResp?.warehouseStock || [];
+            for (const item of stockList) {
+              const qty = item.quantity || 0;
+              const threshold = item.product?.reorderThreshold || 0;
+              const productId = item.product?.id || item.productId;
+              if (threshold > 0 && qty <= threshold && productId && !seenProductIds.has(productId)) {
+                seenProductIds.add(productId);
+                warehouseLowStockItems.push({
+                  id: productId,
+                  name: item.product?.name || 'Unknown',
+                  sku: item.product?.sku || '',
+                  quantity: qty,
+                  minimumStock: threshold,
+                  currentStock: qty,
+                  reorderThreshold: threshold,
+                });
+              }
+            }
+          } catch {
+            // Skip warehouse if stock fetch fails
+          }
+        }
+        // Update count from actual items if we got them
+        if (warehouseLowStockItems.length > 0) {
+          warehouseLowStockCount = warehouseLowStockItems.length;
+        }
+      } catch {
+        // Warehouse low stock fetch failed, fall back to products endpoint data
+      }
+
+      // Use warehouse-derived low stock if available, otherwise fall back to products endpoint
+      const finalLowStockItems = warehouseLowStockItems.length > 0 ? warehouseLowStockItems : lowStockItems;
+      const finalLowStockCount = warehouseLowStockItems.length > 0 ? warehouseLowStockCount : lowStockCount;
+
       setProducts(allProducts);
       setTransactions(allTransactions);
-      setLowStockProducts(lowStockItems);
+      setLowStockProducts(finalLowStockItems);
       setWarehouses(enrichedWarehouses);
 
       // Calculate stats using API totals
       const totalValue = allProducts.reduce((sum: number, p: any) => sum + (((p?.unitPrice ?? p?.price ?? 0)) * ((p?.quantity ?? p?.currentStock) || 0)), 0);
       setStats({
         totalProducts: totalProductsCount,
-        lowStockCount: lowStockCount,
+        lowStockCount: finalLowStockCount,
         totalValue,
       });
     } catch (error: any) {
