@@ -983,6 +983,14 @@ class ApiClient {
     return this.request<any>('/api/stock-transfers', { method: 'POST', body: JSON.stringify(data) });
   }
 
+  async getStockTransfer(id: string) {
+    return this.request<any>(`/api/stock-transfers/${id}`);
+  }
+
+  async updateStockTransfer(id: string, data: Record<string, any>) {
+    return this.request<any>(`/api/stock-transfers/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
   async updateStockTransferStatus(id: string, data: { status: string; items?: Array<{ itemId: string; quantityTransferred: number }> }) {
     return this.request<any>(`/api/stock-transfers/${id}/status`, { method: 'PATCH', body: JSON.stringify(data) });
   }

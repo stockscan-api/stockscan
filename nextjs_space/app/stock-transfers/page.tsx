@@ -25,9 +25,9 @@ import {
   Clock,
   XCircle,
   FileText,
-  Printer,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Link from 'next/link';
 
 interface Transfer {
   id: string;
@@ -196,93 +196,6 @@ export default function StockTransfersPage() {
     return { label: status || 'Unknown', color: 'bg-gray-100 text-gray-700', icon: Clock };
   };
 
-  const printDeliveryNote = (transfer: Transfer) => {
-    const fromName = transfer.fromWarehouse?.name || 'Unknown';
-    const toName = transfer.toWarehouse?.name || 'Unknown';
-    const dateStr = transfer.createdAt ? new Date(transfer.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : 'N/A';
-    const items = transfer.items || [];
-
-    const itemRows = items.map((item, idx) => `
-      <tr>
-        <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb; text-align:center;">${idx + 1}</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb; font-weight:500;">${item.product?.name || 'Unknown Product'}</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb; font-family:monospace; font-size:12px; color:#6b7280;">${item.product?.sku || '-'}</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb; text-align:center; font-weight:600; font-size:16px;">${item.quantity}</td>
-        <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb; width:100px;"></td>
-      </tr>
-    `).join('');
-
-    const w = window.open('', '_blank');
-    if (w) {
-      w.document.write(`<!DOCTYPE html><html><head><title>Delivery Note - ${transfer.transferNumber || 'Transfer'}</title>
-      <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:#1f2937; padding:40px; max-width:800px; margin:0 auto; }
-        @media print {
-          body { padding:20px; }
-          .no-print { display:none !important; }
-        }
-      </style></head><body>
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:30px; padding-bottom:20px; border-bottom:3px solid #2563eb;">
-        <div>
-          <h1 style="font-size:24px; font-weight:700; color:#1e40af;">DELIVERY NOTE</h1>
-          <p style="color:#6b7280; margin-top:4px;">Stock Transfer Picking List</p>
-        </div>
-        <div style="text-align:right;">
-          ${transfer.transferNumber ? `<p style="font-size:14px; font-weight:600; color:#1f2937;">Ref: ${transfer.transferNumber}</p>` : ''}
-          <p style="font-size:13px; color:#6b7280;">Date: ${dateStr}</p>
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:30px;">
-        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:16px;">
-          <p style="font-size:11px; text-transform:uppercase; color:#3b82f6; font-weight:600; margin-bottom:4px;">Pick From</p>
-          <p style="font-size:16px; font-weight:600; color:#1e40af;">${fromName}</p>
-        </div>
-        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:16px;">
-          <p style="font-size:11px; text-transform:uppercase; color:#22c55e; font-weight:600; margin-bottom:4px;">Deliver To</p>
-          <p style="font-size:16px; font-weight:600; color:#166534;">${toName}</p>
-        </div>
-      </div>
-
-      ${transfer.notes ? `<p style="background:#fefce8; border:1px solid #fde68a; border-radius:6px; padding:10px 14px; font-size:13px; color:#854d0e; margin-bottom:20px;"><strong>Notes:</strong> ${transfer.notes}</p>` : ''}
-
-      <table style="width:100%; border-collapse:collapse; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
-        <thead>
-          <tr style="background:#f3f4f6;">
-            <th style="padding:10px 12px; text-align:center; font-size:12px; font-weight:600; color:#6b7280; width:50px;">#</th>
-            <th style="padding:10px 12px; text-align:left; font-size:12px; font-weight:600; color:#6b7280;">Product</th>
-            <th style="padding:10px 12px; text-align:left; font-size:12px; font-weight:600; color:#6b7280;">SKU</th>
-            <th style="padding:10px 12px; text-align:center; font-size:12px; font-weight:600; color:#6b7280; width:80px;">Qty</th>
-            <th style="padding:10px 12px; text-align:center; font-size:12px; font-weight:600; color:#6b7280; width:100px;">Picked ✓</th>
-          </tr>
-        </thead>
-        <tbody>${itemRows}</tbody>
-      </table>
-
-      <div style="margin-top:40px; display:grid; grid-template-columns:1fr 1fr; gap:30px;">
-        <div>
-          <p style="font-size:12px; color:#6b7280; margin-bottom:8px;">Picked By:</p>
-          <div style="border-bottom:1px solid #d1d5db; height:40px;"></div>
-          <p style="font-size:11px; color:#9ca3af; margin-top:4px;">Name / Date</p>
-        </div>
-        <div>
-          <p style="font-size:12px; color:#6b7280; margin-bottom:8px;">Received By:</p>
-          <div style="border-bottom:1px solid #d1d5db; height:40px;"></div>
-          <p style="font-size:11px; color:#9ca3af; margin-top:4px;">Name / Date</p>
-        </div>
-      </div>
-
-      <div class="no-print" style="margin-top:30px; text-align:center;">
-        <button onclick="window.print()" style="background:#2563eb; color:white; border:none; padding:12px 32px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600;">
-          Print Delivery Note
-        </button>
-      </div>
-      </body></html>`);
-      w.document.close();
-    }
-  };
-
   const filteredTransfers = transfers.filter(t => {
     if (statusFilter && t.status?.toUpperCase() !== statusFilter) return false;
     if (searchQuery) {
@@ -414,17 +327,12 @@ export default function StockTransfersPage() {
                             {new Date(transfer.createdAt).toLocaleDateString()}
                           </span>
                         )}
-                        {transfer.items && transfer.items.length > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => { e.stopPropagation(); printDeliveryNote(transfer); }}
-                            className="ml-1 text-xs"
-                          >
+                        <Link href={`/stock-transfers/${transfer.id}`}>
+                          <Button variant="outline" size="sm" className="ml-1 text-xs">
                             <FileText className="h-3.5 w-3.5 mr-1" />
-                            Delivery Note
+                            View Details
                           </Button>
-                        )}
+                        </Link>
                       </div>
                     </div>
                     {/* Show items preview */}
