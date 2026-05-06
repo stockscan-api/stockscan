@@ -496,9 +496,7 @@ export default function PosPage() {
   const handleCreateDeliveryNote = async () => {
     if (!invoiceData) return;
     try {
-      await apiClient.createDeliveryFromSale(invoiceData.id, {
-        fulfillmentMethod: 'COLLECTION',
-      });
+      await apiClient.createDeliveryFromSale(invoiceData.id);
       toast.success('Delivery note created — view it in Deliveries');
     } catch (err: any) {
       toast.error(err.message || 'Failed to create delivery note');
@@ -1138,9 +1136,7 @@ export default function PosPage() {
                 <button
                   onClick={async () => {
                     try {
-                      await apiClient.createDeliveryFromSale(selectedSale.id, {
-                        fulfillmentMethod: 'COLLECTION',
-                      });
+                      await apiClient.createDeliveryFromSale(selectedSale.id);
                       toast.success('Delivery note created — view it in Deliveries');
                       setSelectedSale(null);
                     } catch (err: any) {

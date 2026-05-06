@@ -332,9 +332,7 @@ export default function StockTransfersPage() {
                           className="ml-1 text-xs"
                           onClick={async () => {
                             try {
-                              const result = await apiClient.createDeliveryFromTransfer(transfer.id, {
-                                fulfillmentMethod: 'DELIVERY',
-                              });
+                              const result = await apiClient.createDeliveryFromTransfer(transfer.id);
                               toast.success('Delivery note created — view it in Deliveries');
                             } catch (err: any) {
                               if (err.message?.includes('already') || err.status === 400) {
