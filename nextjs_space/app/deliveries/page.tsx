@@ -30,6 +30,7 @@ import {
   Upload,
   FileSpreadsheet,
   X,
+  Trash2,
 } from 'lucide-react';
 
 interface DeliveryItem {
@@ -87,6 +88,9 @@ export default function DeliveriesPage() {
   // Sage auto-fill
   const [isLoadingSage, setIsLoadingSage] = useState(false);
   const [sageItems, setSageItems] = useState<any[]>([]);
+  
+  // Manual items
+  const [manualItems, setManualItems] = useState<{ productName: string; sku: string; quantity: number }[]>([]);
   
   // Excel file import
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -197,15 +201,29 @@ export default function DeliveriesPage() {
 
     setIsCreating(true);
     try {
-      // v1.2.25 Map parsed items to the backend's expected format
-      // For Sage imports: productId = null, sku = product code, productName = description
-      const deliveryItems = sageItems.length > 0 ? sageItems.map(item => ({
-        productId: null,  // null for products not in database (Sage imports)
+      // Combine Sage items + manual items into deliveryItems
+      let deliveryItems: any[] | undefined;
+      
+      const sageDeliveryItems = sageItems.map(item => ({
+        productId: null,
         productName: String(item.description || item.productName || 'Unknown Product'),
         sku: String(item.productCode || item.partNumber || ''),
         quantity: Math.round(Number(item.quantity) || 1),
         notes: 'Imported from Sage Sales Order',
-      })) : undefined;
+      }));
+      
+      const manualDeliveryItems = manualItems
+        .filter(item => item.productName.trim())
+        .map(item => ({
+          productId: null,
+          productName: item.productName.trim(),
+          sku: item.sku.trim() || '',
+          quantity: Math.max(1, Math.round(item.quantity)),
+          notes: '',
+        }));
+      
+      const allItems = [...sageDeliveryItems, ...manualDeliveryItems];
+      deliveryItems = allItems.length > 0 ? allItems : undefined;
 
       await apiClient.createDelivery({
         customerName: formData.customerName,
@@ -235,10 +253,24 @@ export default function DeliveriesPage() {
       deliveryDate: '',
     });
     setSageItems([]);
+    setManualItems([]);
     setSelectedFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  // Manual item helpers
+  const addManualItem = () => {
+    setManualItems(prev => [...prev, { productName: '', sku: '', quantity: 1 }]);
+  };
+
+  const updateManualItem = (index: number, field: string, value: string | number) => {
+    setManualItems(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  };
+
+  const removeManualItem = (index: number) => {
+    setManualItems(prev => prev.filter((_, i) => i !== index));
   };
 
   // DELIVERY_CLERK can only access deliveries
@@ -573,6 +605,95 @@ export default function DeliveriesPage() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Manual Parts Entry */}
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-blue-800">
+                  <Package className="h-4 w-4 inline mr-1" />
+                  Delivery Items
+                </label>
+                <Button type="button" variant="outline" size="sm" onClick={addManualItem} className="text-blue-700 border-blue-300 hover:bg-blue-100">
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Part
+                </Button>
+              </div>
+              <p className="text-xs text-blue-600 mb-3">
+                Manually add parts/items to this delivery
+              </p>
+
+              {manualItems.length === 0 ? (
+                <div
+                  onClick={addManualItem}
+                  className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center cursor-pointer hover:bg-blue-100 transition-colors"
+                >
+                  <Package className="h-6 w-6 mx-auto text-blue-400 mb-1" />
+                  <p className="text-sm text-blue-700 font-medium">Click to add parts manually</p>
+                  <p className="text-xs text-blue-500 mt-0.5">Enter product name, SKU, and quantity</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Header */}
+                  <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-blue-700 px-1">
+                    <div className="col-span-5">Part Name *</div>
+                    <div className="col-span-3">SKU / Code</div>
+                    <div className="col-span-2">Qty</div>
+                    <div className="col-span-2"></div>
+                  </div>
+                  {manualItems.map((item, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-5">
+                        <Input
+                          value={item.productName}
+                          onChange={(e) => updateManualItem(idx, 'productName', e.target.value)}
+                          placeholder="Part name"
+                          className="text-sm h-9"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Input
+                          value={item.sku}
+                          onChange={(e) => updateManualItem(idx, 'sku', e.target.value)}
+                          placeholder="SKU"
+                          className="text-sm h-9"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) => updateManualItem(idx, 'quantity', parseInt(e.target.value) || 1)}
+                          className="text-sm h-9"
+                        />
+                      </div>
+                      <div className="col-span-2 flex justify-center">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeManualItem(idx)}
+                          className="text-red-400 hover:text-red-600 hover:bg-red-50 h-9 w-9 p-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="ghost" size="sm" onClick={addManualItem} className="text-blue-600 hover:text-blue-800 text-xs w-full">
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add another part
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Summary of all items */}
+            {(sageItems.length > 0 || manualItems.filter(i => i.productName.trim()).length > 0) && (
+              <p className="text-xs text-gray-500 text-right">
+                Total: {sageItems.length + manualItems.filter(i => i.productName.trim()).length} item(s) will be added to this delivery
+              </p>
             )}
 
             <div className="flex justify-end gap-3 pt-4">
