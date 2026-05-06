@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Pencil,
   Tag,
+  Truck,
 } from 'lucide-react';
 
 interface CartItem {
@@ -492,6 +493,27 @@ export default function PosPage() {
     setView('history');
   };
 
+  const handleCreateDeliveryNote = async () => {
+    if (!invoiceData) return;
+    try {
+      const items = invoiceData.items.map(item => ({
+        productId: null,
+        productName: item.name,
+        sku: item.sku || '',
+        quantity: item.quantity,
+        notes: `From POS sale ${invoiceData.saleNumber || ''}`,
+      }));
+      await apiClient.createDelivery({
+        customerName: invoiceData.customerName || 'Walk-in Customer',
+        notes: `Created from POS sale ${invoiceData.saleNumber || invoiceData.id}`,
+        items,
+      });
+      toast.success('Delivery note created — view it in Deliveries');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create delivery note');
+    }
+  };
+
   /** Open invoice view for a historical sale */
   const viewSaleInvoice = (sale: Sale) => {
     const invoice: InvoiceData = {
@@ -580,29 +602,38 @@ export default function PosPage() {
 
             {/* Action Buttons */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleNewSale}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
                 >
                   <Plus className="h-4 w-4" />
                   New Sale
                 </button>
                 <button
                   onClick={handleBackToHistory}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm"
                 >
                   <History className="h-4 w-4" />
-                  Sales History
+                  History
                 </button>
               </div>
-              <button
-                onClick={handlePrintReceipt}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
-              >
-                <Printer className="h-4 w-4" />
-                Print Invoice
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={handleCreateDeliveryNote}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm"
+                >
+                  <Truck className="h-4 w-4" />
+                  Delivery Note
+                </button>
+                <button
+                  onClick={handlePrintReceipt}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+                >
+                  <Printer className="h-4 w-4" />
+                  Print
+                </button>
+              </div>
             </div>
 
             {/* Printable Receipt Content */}
@@ -1111,6 +1142,33 @@ export default function PosPage() {
                 >
                   <Printer className="h-4 w-4" />
                   View / Print Invoice
+                </button>
+                {/* Create Delivery Note from this sale */}
+                <button
+                  onClick={async () => {
+                    try {
+                      const saleItems = (selectedSale.items || []).map((item: any) => ({
+                        productId: null,
+                        productName: item.productName || item.name || 'Item',
+                        sku: item.sku || '',
+                        quantity: item.quantity || 1,
+                        notes: `From POS sale ${selectedSale.saleNumber || selectedSale.id.slice(0, 8)}`,
+                      }));
+                      await apiClient.createDelivery({
+                        customerName: selectedSale.customerName || 'Walk-in Customer',
+                        notes: `Created from POS sale ${selectedSale.saleNumber || selectedSale.id.slice(0, 8)}`,
+                        items: saleItems.length > 0 ? saleItems : undefined,
+                      });
+                      toast.success('Delivery note created — view it in Deliveries');
+                      setSelectedSale(null);
+                    } catch (err: any) {
+                      toast.error(err.message || 'Failed to create delivery note');
+                    }
+                  }}
+                  className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+                >
+                  <Truck className="h-4 w-4" />
+                  Create Delivery Note
                 </button>
               </div>
             </div>
