@@ -496,17 +496,8 @@ export default function PosPage() {
   const handleCreateDeliveryNote = async () => {
     if (!invoiceData) return;
     try {
-      const items = invoiceData.items.map(item => ({
-        productId: null,
-        productName: item.name,
-        sku: item.sku || '',
-        quantity: item.quantity,
-        notes: `From POS sale ${invoiceData.saleNumber || ''}`,
-      }));
-      await apiClient.createDelivery({
-        customerName: invoiceData.customerName || 'Walk-in Customer',
-        notes: `Created from POS sale ${invoiceData.saleNumber || invoiceData.id}`,
-        items,
+      await apiClient.createDeliveryFromSale(invoiceData.id, {
+        fulfillmentMethod: 'COLLECTION',
       });
       toast.success('Delivery note created — view it in Deliveries');
     } catch (err: any) {
@@ -1147,17 +1138,8 @@ export default function PosPage() {
                 <button
                   onClick={async () => {
                     try {
-                      const saleItems = (selectedSale.items || []).map((item: any) => ({
-                        productId: null,
-                        productName: item.productName || item.name || 'Item',
-                        sku: item.sku || '',
-                        quantity: item.quantity || 1,
-                        notes: `From POS sale ${selectedSale.saleNumber || selectedSale.id.slice(0, 8)}`,
-                      }));
-                      await apiClient.createDelivery({
-                        customerName: selectedSale.customerName || 'Walk-in Customer',
-                        notes: `Created from POS sale ${selectedSale.saleNumber || selectedSale.id.slice(0, 8)}`,
-                        items: saleItems.length > 0 ? saleItems : undefined,
+                      await apiClient.createDeliveryFromSale(selectedSale.id, {
+                        fulfillmentMethod: 'COLLECTION',
                       });
                       toast.success('Delivery note created — view it in Deliveries');
                       setSelectedSale(null);

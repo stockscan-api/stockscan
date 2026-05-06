@@ -24,10 +24,9 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
-  FileText,
+  Truck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import Link from 'next/link';
 
 interface Transfer {
   id: string;
@@ -327,12 +326,28 @@ export default function StockTransfersPage() {
                             {new Date(transfer.createdAt).toLocaleDateString()}
                           </span>
                         )}
-                        <Link href={`/stock-transfers/${transfer.id}`}>
-                          <Button variant="outline" size="sm" className="ml-1 text-xs">
-                            <FileText className="h-3.5 w-3.5 mr-1" />
-                            View Details
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="ml-1 text-xs"
+                          onClick={async () => {
+                            try {
+                              const result = await apiClient.createDeliveryFromTransfer(transfer.id, {
+                                fulfillmentMethod: 'DELIVERY',
+                              });
+                              toast.success('Delivery note created — view it in Deliveries');
+                            } catch (err: any) {
+                              if (err.message?.includes('already') || err.status === 400) {
+                                toast.error('A delivery note already exists for this transfer');
+                              } else {
+                                toast.error(err.message || 'Failed to create delivery note');
+                              }
+                            }
+                          }}
+                        >
+                          <Truck className="h-3.5 w-3.5 mr-1" />
+                          Create Delivery Note
+                        </Button>
                       </div>
                     </div>
                     {/* Show items preview */}

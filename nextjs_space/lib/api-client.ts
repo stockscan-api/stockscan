@@ -600,15 +600,18 @@ class ApiClient {
   }
 
   // ============ DELIVERIES APIs ============
-  // Based on v1.2.25 API spec: Status is PENDING | COLLECTED | CANCELLED
+  // v1.14.1: DeliveryType = CUSTOMER | TRANSFER, FulfillmentMethod = DELIVERY | COLLECTION
+  // Status = PENDING | DELIVERED | COLLECTED | CANCELLED
 
-  // Get all deliveries
-  async getDeliveries(params?: { page?: number; limit?: number; status?: string; search?: string }) {
+  // Get all deliveries (v1.14.1 - supports type, fulfillment filters)
+  async getDeliveries(params?: { page?: number; limit?: number; status?: string; search?: string; type?: string; fulfillment?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.status) searchParams.append('status', params.status);
     if (params?.search) searchParams.append('search', params.search);
+    if (params?.type) searchParams.append('type', params.type);
+    if (params?.fulfillment) searchParams.append('fulfillment', params.fulfillment);
     const query = searchParams.toString();
     return this.request<any>(`/api/deliveries${query ? `?${query}` : ''}`);
   }
@@ -618,8 +621,7 @@ class ApiClient {
     return this.request<any>(`/api/deliveries/${id}`);
   }
 
-  // Create delivery (v1.2.25 spec)
-  // Backend accepts: productId (null for Sage imports), productName, sku, quantity, notes
+  // Create delivery (v1.14.1 - supports deliveryType, fulfillmentMethod, warehouse IDs)
   async createDelivery(data: {
     customerName: string;
     customerEmail?: string;
@@ -627,10 +629,15 @@ class ApiClient {
     sageOrderReference?: string;
     deliveryDate?: string;
     notes?: string;
+    deliveryType?: 'CUSTOMER' | 'TRANSFER';
+    fulfillmentMethod?: 'DELIVERY' | 'COLLECTION';
+    sourceWarehouseId?: string;
+    destinationWarehouseId?: string;
+    stockTransferId?: string;
     items?: Array<{
-      productId: string | null;  // null for products not in database (Sage imports)
+      productId: string | null;
       productName: string;
-      sku?: string;  // Product code from Sage
+      sku?: string;
       quantity: number;
       notes?: string;
     }>;
@@ -641,13 +648,30 @@ class ApiClient {
     });
   }
 
-  // Update delivery
+  // Create delivery from POS sale (v1.14.1)
+  async createDeliveryFromSale(saleId: string, data?: { fulfillmentMethod?: 'DELIVERY' | 'COLLECTION'; notes?: string }) {
+    return this.request<any>(`/api/deliveries/from-sale/${saleId}`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    });
+  }
+
+  // Create delivery from stock transfer (v1.14.1)
+  async createDeliveryFromTransfer(transferId: string, data?: { notes?: string; fulfillmentMethod?: string }) {
+    return this.request<any>(`/api/deliveries/from-transfer/${transferId}`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    });
+  }
+
+  // Update delivery (v1.14.1 - also accepts fulfillmentMethod)
   async updateDelivery(id: string, data: {
     customerName?: string;
     customerEmail?: string;
     customerPhone?: string;
     sageOrderReference?: string;
     deliveryDate?: string;
+    fulfillmentMethod?: 'DELIVERY' | 'COLLECTION';
   }) {
     return this.request<any>(`/api/deliveries/${id}`, {
       method: 'PATCH',
@@ -655,15 +679,35 @@ class ApiClient {
     });
   }
 
-  // Collect delivery with signature (v1.2.25 - PATCH /api/deliveries/:id/collect)
+  // Capture signature (v1.14.1 - POST /api/deliveries/:id/signature)
+  // Auto-sets status: DELIVERY→DELIVERED, COLLECTION→COLLECTED
+  async captureDeliverySignature(id: string, data: {
+    signatureBase64: string;
+    signedBy: string;
+  }) {
+    return this.request<any>(`/api/deliveries/${id}/signature`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Legacy collect (keep for backward compat)
   async collectDelivery(id: string, data: {
     signatureBase64: string;
     signedBy: string;
   }) {
-    return this.request<any>(`/api/deliveries/${id}/collect`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
+    // Try new endpoint first, fall back to old
+    try {
+      return await this.request<any>(`/api/deliveries/${id}/signature`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    } catch {
+      return this.request<any>(`/api/deliveries/${id}/collect`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    }
   }
 
   // Cancel delivery (v1.2.25 - PATCH /api/deliveries/:id/cancel)

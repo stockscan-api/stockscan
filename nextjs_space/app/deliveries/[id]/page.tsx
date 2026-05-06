@@ -16,6 +16,7 @@ import Image from 'next/image';
 import {
   Truck,
   ArrowLeft,
+  ArrowRight,
   Loader2,
   Calendar,
   Phone,
@@ -33,6 +34,7 @@ import {
   Download,
   Send,
   Ban,
+  Warehouse,
 } from 'lucide-react';
 
 interface DeliveryItem {
@@ -50,7 +52,12 @@ interface Delivery {
   customerEmail?: string;
   customerPhone?: string;
   sageOrderReference?: string;
-  status: 'PENDING' | 'COLLECTED' | 'CANCELLED';
+  status: 'PENDING' | 'DELIVERED' | 'COLLECTED' | 'CANCELLED';
+  deliveryType?: 'CUSTOMER' | 'TRANSFER';
+  fulfillmentMethod?: 'DELIVERY' | 'COLLECTION';
+  sourceWarehouse?: { id: string; name: string; code?: string };
+  destinationWarehouse?: { id: string; name: string; code?: string };
+  stockTransferId?: string;
   deliveryDate?: string;
   signatureUrl?: string;
   signedBy?: string;
@@ -61,9 +68,10 @@ interface Delivery {
   updatedAt: string;
 }
 
-// v1.2.25 status config
+// v1.14.1 status config: PENDING | DELIVERED | COLLECTED | CANCELLED
 const statusConfig: Record<string, { label: string; color: string; bgColor: string; icon: any }> = {
   PENDING: { label: 'Pending', color: 'text-yellow-800', bgColor: 'bg-yellow-100', icon: Clock },
+  DELIVERED: { label: 'Delivered', color: 'text-green-800', bgColor: 'bg-green-100', icon: CheckCircle },
   COLLECTED: { label: 'Collected', color: 'text-green-800', bgColor: 'bg-green-100', icon: CheckCircle },
   CANCELLED: { label: 'Cancelled', color: 'text-red-800', bgColor: 'bg-red-100', icon: XCircle },
 };
@@ -266,6 +274,9 @@ export default function DeliveryDetailPage() {
 
   const status = statusConfig[delivery.status] || statusConfig.PENDING;
   const StatusIcon = status.icon;
+  const isTransfer = delivery.deliveryType === 'TRANSFER';
+  const isDeliveryFulfillment = delivery.fulfillmentMethod === 'DELIVERY';
+  const signatureActionLabel = isDeliveryFulfillment ? 'Mark Delivered' : 'Collect with Signature';
 
   return (
     <DashboardLayout>
@@ -284,6 +295,24 @@ export default function DeliveryDetailPage() {
               <Badge className="bg-blue-100 text-blue-800 font-mono text-lg px-3 py-1">
                 {delivery.deliveryNumber}
               </Badge>
+              {/* Type badge */}
+              {isTransfer ? (
+                <Badge className="bg-orange-100 text-orange-800">
+                  <Warehouse className="h-4 w-4 mr-1" />
+                  Stock Transfer
+                </Badge>
+              ) : (
+                <Badge className="bg-indigo-100 text-indigo-800">
+                  <Truck className="h-4 w-4 mr-1" />
+                  Customer
+                </Badge>
+              )}
+              {/* Fulfillment badge */}
+              {delivery.fulfillmentMethod && (
+                <Badge className={isDeliveryFulfillment ? 'bg-cyan-100 text-cyan-800' : 'bg-teal-100 text-teal-800'}>
+                  {isDeliveryFulfillment ? 'Delivery' : 'Collection'}
+                </Badge>
+              )}
               <Badge className={`${status.bgColor} ${status.color}`}>
                 <StatusIcon className="h-4 w-4 mr-1" />
                 {status.label}
@@ -302,6 +331,16 @@ export default function DeliveryDetailPage() {
               )}
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mt-2">{delivery.customerName}</h1>
+
+            {/* Warehouse route for transfers */}
+            {isTransfer && (delivery.sourceWarehouse || delivery.destinationWarehouse) && (
+              <div className="flex items-center gap-2 text-sm text-orange-700 bg-orange-50 px-3 py-2 rounded-md w-fit mt-2">
+                <Warehouse className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">{delivery.sourceWarehouse?.name || 'Unknown'}</span>
+                <ArrowRight className="h-3 w-3 flex-shrink-0" />
+                <span className="font-medium">{delivery.destinationWarehouse?.name || 'Unknown'}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -315,14 +354,14 @@ export default function DeliveryDetailPage() {
               Email PDF
             </Button>
 
-            {/* Collect - only for PENDING deliveries */}
+            {/* Signature action - only for PENDING deliveries */}
             {delivery.status === 'PENDING' && canCollect && (
               <Button
                 onClick={() => setShowCollectModal(true)}
                 className="bg-green-600 hover:bg-green-700"
               >
                 <PenTool className="h-4 w-4 mr-1" />
-                Collect with Signature
+                {signatureActionLabel}
               </Button>
             )}
 
@@ -367,7 +406,7 @@ export default function DeliveryDetailPage() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Truck className="h-5 w-5 text-blue-600" />
-                  Customer Information
+                  {isTransfer ? 'Transfer Details' : 'Customer Information'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -494,7 +533,7 @@ export default function DeliveryDetailPage() {
                         onClick={() => setShowCollectModal(true)}
                       >
                         <PenTool className="h-4 w-4 mr-1" />
-                        Collect Now
+                        {isDeliveryFulfillment ? 'Capture Delivery Signature' : 'Collect Now'}
                       </Button>
                     )}
                   </div>
@@ -508,6 +547,18 @@ export default function DeliveryDetailPage() {
                 <CardTitle className="text-lg">Quick Info</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
+                {delivery.deliveryType && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Type</span>
+                    <span className="font-medium">{isTransfer ? 'Stock Transfer' : 'Customer'}</span>
+                  </div>
+                )}
+                {delivery.fulfillmentMethod && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Fulfillment</span>
+                    <span className="font-medium">{isDeliveryFulfillment ? 'Delivery' : 'Collection'}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-500">Created</span>
                   <span className="font-medium">
@@ -602,12 +653,13 @@ export default function DeliveryDetailPage() {
             setShowCollectModal(false);
             setSignedBy('');
           }}
-          title="Collect Delivery - Capture Signature"
+          title={isDeliveryFulfillment ? 'Mark Delivered - Capture Signature' : 'Collect Delivery - Capture Signature'}
         >
           <div className="space-y-4">
             <div className="bg-blue-50 p-3 rounded-lg">
               <p className="text-sm text-blue-800">
-                Collecting delivery <strong>{delivery.deliveryNumber}</strong> for <strong>{delivery.customerName}</strong>
+                {isDeliveryFulfillment ? 'Confirming delivery of' : 'Collecting delivery'}{' '}
+                <strong>{delivery.deliveryNumber}</strong> for <strong>{delivery.customerName}</strong>
               </p>
             </div>
             <div>

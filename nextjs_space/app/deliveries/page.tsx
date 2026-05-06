@@ -31,6 +31,8 @@ import {
   FileSpreadsheet,
   X,
   Trash2,
+  ArrowRight,
+  Warehouse,
 } from 'lucide-react';
 
 interface DeliveryItem {
@@ -47,7 +49,12 @@ interface Delivery {
   customerEmail?: string;
   customerPhone?: string;
   sageOrderReference?: string;
-  status: 'PENDING' | 'COLLECTED' | 'CANCELLED';
+  status: 'PENDING' | 'DELIVERED' | 'COLLECTED' | 'CANCELLED';
+  deliveryType?: 'CUSTOMER' | 'TRANSFER';
+  fulfillmentMethod?: 'DELIVERY' | 'COLLECTION';
+  sourceWarehouse?: { id: string; name: string; code?: string };
+  destinationWarehouse?: { id: string; name: string; code?: string };
+  stockTransferId?: string;
   deliveryDate?: string;
   signatureUrl?: string;
   signedBy?: string;
@@ -58,9 +65,10 @@ interface Delivery {
   updatedAt: string;
 }
 
-// v1.2.25 status config: PENDING | COLLECTED | CANCELLED
+// v1.14.1 status config: PENDING | DELIVERED | COLLECTED | CANCELLED
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   PENDING: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+  DELIVERED: { label: 'Delivered', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   COLLECTED: { label: 'Collected', color: 'bg-green-100 text-green-800', icon: CheckCircle },
   CANCELLED: { label: 'Cancelled', color: 'bg-red-100 text-red-800', icon: XCircle },
 };
@@ -71,6 +79,7 @@ export default function DeliveriesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -83,6 +92,7 @@ export default function DeliveriesPage() {
     customerPhone: '',
     sageOrderReference: '',
     deliveryDate: '',
+    fulfillmentMethod: 'COLLECTION' as 'DELIVERY' | 'COLLECTION',
   });
 
   // Sage auto-fill
@@ -99,7 +109,7 @@ export default function DeliveriesPage() {
 
   useEffect(() => {
     fetchDeliveries();
-  }, [page, statusFilter]);
+  }, [page, statusFilter, typeFilter]);
 
   const fetchDeliveries = async () => {
     setIsLoading(true);
@@ -109,6 +119,7 @@ export default function DeliveriesPage() {
         limit: 10,
         status: statusFilter || undefined,
         search: searchQuery || undefined,
+        type: typeFilter || undefined,
       });
 
       const deliveryList = response?.deliveries || response?.data || (Array.isArray(response) ? response : []);
@@ -231,6 +242,7 @@ export default function DeliveriesPage() {
         customerPhone: formData.customerPhone || undefined,
         sageOrderReference: formData.sageOrderReference || undefined,
         deliveryDate: formData.deliveryDate || undefined,
+        fulfillmentMethod: formData.fulfillmentMethod,
         items: deliveryItems,
       });
       toast.success('Delivery created successfully');
@@ -251,6 +263,7 @@ export default function DeliveriesPage() {
       customerPhone: '',
       sageOrderReference: '',
       deliveryDate: '',
+      fulfillmentMethod: 'COLLECTION',
     });
     setSageItems([]);
     setManualItems([]);
@@ -286,7 +299,7 @@ export default function DeliveriesPage() {
               <Truck className="h-7 w-7 text-blue-600" />
               Deliveries
             </h1>
-            <p className="text-gray-500">Manage customer collections with signature capture</p>
+            <p className="text-gray-500">Manage deliveries, collections & stock transfers</p>
           </div>
           {canCreateDelivery && (
             <Button onClick={() => setShowCreateModal(true)}>
@@ -310,7 +323,19 @@ export default function DeliveriesPage() {
                   className="pl-10"
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <select
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value);
+                    setPage(1);
+                  }}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Types</option>
+                  <option value="CUSTOMER">Customer</option>
+                  <option value="TRANSFER">Stock Transfer</option>
+                </select>
                 <select
                   value={statusFilter}
                   onChange={(e) => {
@@ -321,6 +346,7 @@ export default function DeliveriesPage() {
                 >
                   <option value="">All Status</option>
                   <option value="PENDING">Pending</option>
+                  <option value="DELIVERED">Delivered</option>
                   <option value="COLLECTED">Collected</option>
                   <option value="CANCELLED">Cancelled</option>
                 </select>
@@ -352,16 +378,35 @@ export default function DeliveriesPage() {
               const status = statusConfig[delivery.status] || statusConfig.PENDING;
               const StatusIcon = status.icon;
               const itemCount = delivery.items?.length || 0;
+              const isTransfer = delivery.deliveryType === 'TRANSFER';
 
               return (
-                <Card key={delivery.id} className="hover:shadow-md transition-shadow">
+                <Card key={delivery.id} className={`hover:shadow-md transition-shadow ${isTransfer ? 'border-l-4 border-l-orange-400' : ''}`}>
                   <CardContent className="p-4">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                       <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge className="bg-blue-100 text-blue-800 font-mono">
                             {delivery.deliveryNumber}
                           </Badge>
+                          {/* Type badge */}
+                          {isTransfer ? (
+                            <Badge className="bg-orange-100 text-orange-800">
+                              <Warehouse className="h-3 w-3 mr-1" />
+                              Transfer
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-indigo-100 text-indigo-800">
+                              <Truck className="h-3 w-3 mr-1" />
+                              Customer
+                            </Badge>
+                          )}
+                          {/* Fulfillment badge */}
+                          {delivery.fulfillmentMethod && (
+                            <Badge className={delivery.fulfillmentMethod === 'DELIVERY' ? 'bg-cyan-100 text-cyan-800' : 'bg-teal-100 text-teal-800'}>
+                              {delivery.fulfillmentMethod === 'DELIVERY' ? 'Delivery' : 'Collection'}
+                            </Badge>
+                          )}
                           <Badge className={status.color}>
                             <StatusIcon className="h-3 w-3 mr-1" />
                             {status.label}
@@ -381,6 +426,16 @@ export default function DeliveriesPage() {
                         </div>
 
                         <h3 className="font-semibold text-gray-900">{delivery.customerName}</h3>
+
+                        {/* Warehouse route for transfers */}
+                        {isTransfer && (delivery.sourceWarehouse || delivery.destinationWarehouse) && (
+                          <div className="flex items-center gap-2 text-sm text-orange-700 bg-orange-50 px-3 py-1.5 rounded-md w-fit">
+                            <Warehouse className="h-4 w-4 flex-shrink-0" />
+                            <span className="font-medium">{delivery.sourceWarehouse?.name || 'Unknown'}</span>
+                            <ArrowRight className="h-3 w-3 flex-shrink-0" />
+                            <span className="font-medium">{delivery.destinationWarehouse?.name || 'Unknown'}</span>
+                          </div>
+                        )}
 
                         <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                           {delivery.customerPhone && (
@@ -524,6 +579,39 @@ export default function DeliveriesPage() {
               />
             </div>
             
+            {/* Fulfillment Method */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Fulfillment Method
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, fulfillmentMethod: 'COLLECTION' })}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                    formData.fulfillmentMethod === 'COLLECTION'
+                      ? 'border-teal-500 bg-teal-50 text-teal-800'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <Package className="h-4 w-4" />
+                  Collection
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, fulfillmentMethod: 'DELIVERY' })}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                    formData.fulfillmentMethod === 'DELIVERY'
+                      ? 'border-cyan-500 bg-cyan-50 text-cyan-800'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <Truck className="h-4 w-4" />
+                  Delivery
+                </button>
+              </div>
+            </div>
+
             {/* Sage Order Reference (manual or extracted from filename) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
