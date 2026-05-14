@@ -68,8 +68,9 @@ export default function TransactionsPage() {
       if (filterEndDate) params.endDate = filterEndDate;
 
       const response = await apiClient.getTransactions(params);
-      setTransactions(response?.data || response || []);
-      setTotalPages(response?.totalPages || 1);
+      const txList = response?.transactions || response?.data || (Array.isArray(response) ? response : []);
+      setTransactions(Array.isArray(txList) ? txList : []);
+      setTotalPages(response?.totalPages || Math.ceil((response?.total || 0) / 15) || 1);
     } catch (error) {
       toast.error('Failed to fetch transactions');
     } finally {
@@ -80,7 +81,8 @@ export default function TransactionsPage() {
   const fetchProducts = useCallback(async () => {
     try {
       const response = await apiClient.getProducts({ limit: 200 });
-      setProducts(response?.data || response || []);
+      const prodList = response?.products || response?.data || (Array.isArray(response) ? response : []);
+      setProducts(Array.isArray(prodList) ? prodList : []);
     } catch (error) {
       console.error('Failed to fetch products');
     }
