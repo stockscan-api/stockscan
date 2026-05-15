@@ -649,19 +649,55 @@ class ApiClient {
     });
   }
 
-  // Create delivery from POS sale (v1.14.1)
-  async createDeliveryFromSale(saleId: string, data?: { fulfillmentMethod?: 'DELIVERY' | 'COLLECTION'; notes?: string; deliveryAddress?: string }) {
-    return this.request<any>(`/api/deliveries/from-sale/${saleId}`, {
+  // Create delivery from POS sale - fetches sale data then creates delivery
+  async createDeliveryFromSale(saleId: string, data?: { notes?: string; deliveryAddress?: string }) {
+    // Fetch the sale to get customer and item details
+    const sale = await this.request<any>(`/api/pos/sales/${saleId}`);
+    const saleData = sale?.sale || sale;
+
+    // Map sale items to delivery items format
+    const items = (saleData.items || []).map((item: any) => ({
+      productId: item.productId || undefined,
+      productName: item.productName || item.name || 'Unknown Item',
+      sku: item.sku || undefined,
+      quantity: item.quantity || 1,
+    }));
+
+    // Create delivery using standard endpoint
+    return this.request<any>('/api/deliveries', {
       method: 'POST',
-      body: JSON.stringify(data || {}),
+      body: JSON.stringify({
+        customerName: saleData.customerName || 'Walk-in Customer',
+        customerEmail: saleData.customerEmail || undefined,
+        customerPhone: saleData.customerPhone || undefined,
+        notes: data?.notes || `From POS Sale ${saleData.saleNumber || saleId}`,
+        items,
+      }),
     });
   }
 
-  // Create delivery from stock transfer (v1.14.1)
-  async createDeliveryFromTransfer(transferId: string, data?: { notes?: string; fulfillmentMethod?: string; deliveryAddress?: string }) {
-    return this.request<any>(`/api/deliveries/from-transfer/${transferId}`, {
+  // Create delivery from stock transfer - fetches transfer data then creates delivery
+  async createDeliveryFromTransfer(transferId: string, data?: { notes?: string; deliveryAddress?: string }) {
+    // Fetch the transfer to get item details
+    const transfer = await this.request<any>(`/api/stock-transfers/${transferId}`);
+    const transferData = transfer?.transfer || transfer;
+
+    // Map transfer items to delivery items format
+    const items = (transferData.items || []).map((item: any) => ({
+      productId: item.productId || item.product?.id || undefined,
+      productName: item.product?.name || item.productName || 'Unknown Item',
+      sku: item.product?.sku || item.sku || undefined,
+      quantity: item.quantity || 1,
+    }));
+
+    // Create delivery using standard endpoint
+    return this.request<any>('/api/deliveries', {
       method: 'POST',
-      body: JSON.stringify(data || {}),
+      body: JSON.stringify({
+        customerName: `Transfer: ${transferData.fromLocation || 'Source'} → ${transferData.toLocation || 'Destination'}`,
+        notes: data?.notes || `From Stock Transfer ${transferData.transferNumber || transferId}`,
+        items,
+      }),
     });
   }
 
