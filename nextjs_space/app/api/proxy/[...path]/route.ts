@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = 'https://api.stockscan.uk';
+const DEFAULT_BACKEND_URL = 'https://api.stockscan.uk';
+
+function getBackendUrl(request: NextRequest): string {
+  // Read custom backend URL from header (set by client-side api-client)
+  const customUrl = request.headers.get('x-backend-url');
+  if (customUrl && customUrl.startsWith('http')) {
+    return customUrl.replace(/\/+$/, '');
+  }
+  return DEFAULT_BACKEND_URL;
+}
 
 async function proxyRequest(request: NextRequest, pathSegments: string[]) {
+  const BACKEND_URL = getBackendUrl(request);
   const path = pathSegments.join('/');
   const url = `${BACKEND_URL}/${path}`;
   

@@ -7,13 +7,15 @@ import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Eye, EyeOff, Loader2, Mail, KeyRound, ShieldCheck, ArrowLeft, X } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, KeyRound, ShieldCheck, ArrowLeft, X, Cloud, Building, Server } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '@/lib/api-client';
+import { useServerConnection } from '@/contexts/server-connection-context';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading: authLoading, isSuperAdmin } = useAuth();
+  const { connection } = useServerConnection();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -148,6 +150,21 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl">Welcome Back</CardTitle>
           <CardDescription>Sign in to your StockScan account</CardDescription>
+          {/* Server Connection Badge */}
+          <div className="mt-3 flex justify-center">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+              connection.type === 'enterprise'
+                ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                : 'bg-blue-50 text-blue-700 border border-blue-200'
+            }`}>
+              {connection.type === 'enterprise' ? (
+                <Building className="h-3 w-3" />
+              ) : (
+                <Cloud className="h-3 w-3" />
+              )}
+              {connection.label}
+            </span>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

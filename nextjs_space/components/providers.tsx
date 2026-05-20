@@ -3,6 +3,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { AuthProvider } from '@/contexts/auth-context';
 import { CurrencyProvider } from '@/contexts/currency-context';
+import { ServerConnectionProvider } from '@/contexts/server-connection-context';
 import { Toaster } from 'react-hot-toast';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -17,11 +18,13 @@ export function Providers({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthProvider>
-      <CurrencyProvider>
-        {children}
-        <Toaster position="top-right" />
-      </CurrencyProvider>
-    </AuthProvider>
+    <ServerConnectionProvider>
+      <AuthProvider>
+        <CurrencyProvider>
+          {children}
+          <Toaster position="top-right" />
+        </CurrencyProvider>
+      </AuthProvider>
+    </ServerConnectionProvider>
   );
 }

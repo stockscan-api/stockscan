@@ -31,9 +31,12 @@ import {
   ShoppingBag,
   Building2,
   ScanLine,
+  Cloud,
+  Building,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useServerConnection } from '@/contexts/server-connection-context';
 
 // v1.2.25: Navigation items with role-based access
 // DELIVERY_CLERK only has access to Deliveries (create, collect, PDF export)
@@ -65,6 +68,7 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout, hasRole, isSuperAdmin } = useAuth();
+  const { connection } = useServerConnection();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const filteredNavItems = navItems.filter(item => 
@@ -165,6 +169,28 @@ export function Sidebar() {
               <span>Logout</span>
             </button>
           </div>
+
+          {/* Server Connection Indicator */}
+          <Link
+            href="/settings"
+            onClick={() => setMobileOpen(false)}
+            className="mx-4 mb-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors group"
+          >
+            {connection.type === 'enterprise' ? (
+              <Building className="h-3.5 w-3.5 text-purple-400 flex-shrink-0" />
+            ) : (
+              <Cloud className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] text-slate-500 leading-tight">Connected to</p>
+              <p className="text-xs text-slate-300 truncate leading-tight group-hover:text-white transition-colors">
+                {connection.label}
+              </p>
+            </div>
+            <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+              connection.type === 'enterprise' ? 'bg-purple-400' : 'bg-blue-400'
+            }`} />
+          </Link>
 
           {/* Copyright */}
           <div className="px-4 pb-4 text-center">

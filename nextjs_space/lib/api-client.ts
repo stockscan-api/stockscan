@@ -2,11 +2,17 @@
 
 // Use proxy to avoid CORS issues - requests go through /api/proxy/* to the backend
 const API_BASE_URL = '/api/proxy';
+const STORAGE_SERVER_URL_KEY = 'stockscan_server_url';
 
 class ApiClient {
   private getToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('auth_token');
+  }
+
+  private getBackendUrl(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(STORAGE_SERVER_URL_KEY) || null;
   }
 
   private setToken(token: string): void {
@@ -24,6 +30,7 @@ class ApiClient {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = this.getToken();
+    const backendUrl = this.getBackendUrl();
     const headers: HeadersInit = {
       ...(options.headers || {}),
     };
@@ -35,6 +42,11 @@ class ApiClient {
 
     if (token) {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Pass custom backend URL to proxy if set
+    if (backendUrl) {
+      (headers as Record<string, string>)['x-backend-url'] = backendUrl;
     }
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -63,10 +75,16 @@ class ApiClient {
 
   private async requestFormData<T>(endpoint: string, formData: FormData): Promise<T> {
     const token = this.getToken();
+    const backendUrl = this.getBackendUrl();
     const headers: HeadersInit = {};
 
     if (token) {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Pass custom backend URL to proxy if set
+    if (backendUrl) {
+      (headers as Record<string, string>)['x-backend-url'] = backendUrl;
     }
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {

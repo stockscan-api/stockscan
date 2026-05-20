@@ -13,11 +13,13 @@ import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api-client';
 import {
   Settings, Globe, Check, Link2, Unlink, ExternalLink, Loader2,
-  Shield, Zap, Clock, CheckCircle2, AlertCircle, ArrowRight, Lock, Eye, EyeOff
+  Shield, Zap, Clock, CheckCircle2, AlertCircle, ArrowRight, Lock, Eye, EyeOff,
+  Server, Wifi, WifiOff, Cloud, Building, RotateCcw, Activity
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useServerConnection, DEFAULT_SAAS_URL, ServerType } from '@/contexts/server-connection-context';
 
-type SettingsTab = 'currency' | 'password' | 'integrations';
+type SettingsTab = 'currency' | 'password' | 'server' | 'integrations';
 
 interface IntegrationStatus {
   xero: { connected: boolean; tenantName?: string; connectedAt?: string };
@@ -64,6 +66,7 @@ const INTEGRATIONS = [
 export default function SettingsPage() {
   const { user } = useAuth();
   const { currency, setCurrency, formatPrice } = useCurrency();
+  const { connection, setConnection, isDefault, testConnection } = useServerConnection();
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(currency);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SettingsTab>('currency');
@@ -83,6 +86,69 @@ export default function SettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+
+  // Server connection state
+  const [serverUrl, setServerUrl] = useState('');
+  const [serverLabel, setServerLabel] = useState('');
+  const [serverType, setServerType] = useState<ServerType>('saas');
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; version?: string; serverName?: string; responseTime?: number; error?: string } | null>(null);
+  const [isSavingServer, setIsSavingServer] = useState(false);
+
+  // Sync server form with current connection
+  useEffect(() => {
+    setServerUrl(connection.url);
+    setServerLabel(connection.label);
+    setServerType(connection.type);
+  }, [connection]);
+
+  const handleTestConnection = async () => {
+    if (!serverUrl.trim()) {
+      toast.error('Please enter a server URL');
+      return;
+    }
+    setIsTesting(true);
+    setTestResult(null);
+    const result = await testConnection(serverUrl.trim());
+    setTestResult(result);
+    setIsTesting(false);
+    if (result.success) {
+      toast.success(`Connection successful${result.responseTime ? ` (${result.responseTime}ms)` : ''}`);
+    } else {
+      toast.error(result.error || 'Connection failed');
+    }
+  };
+
+  const handleSaveServer = () => {
+    if (!serverUrl.trim()) {
+      toast.error('Please enter a server URL');
+      return;
+    }
+    setIsSavingServer(true);
+    const normalizedUrl = serverUrl.trim().replace(/\/+$/, '');
+    const label = serverLabel.trim() || (serverType === 'enterprise' ? 'Enterprise Server' : 'StockScan Cloud');
+    setConnection({ url: normalizedUrl, label, type: serverType });
+    
+    // Clear auth when switching servers - user needs to re-login
+    if (normalizedUrl !== connection.url) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      toast.success('Server updated. You will be redirected to login.');
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 1500);
+    } else {
+      toast.success('Server connection saved');
+    }
+    setIsSavingServer(false);
+  };
+
+  const handleResetToSaaS = () => {
+    setServerUrl(DEFAULT_SAAS_URL);
+    setServerLabel('StockScan Cloud');
+    setServerType('saas');
+    setTestResult(null);
+  };
 
   const filteredCurrencies = CURRENCIES.filter(
     c =>
@@ -224,6 +290,7 @@ export default function SettingsPage() {
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'currency', label: 'Currency', icon: <Globe className="h-4 w-4" /> },
     { id: 'password', label: 'Password', icon: <Lock className="h-4 w-4" /> },
+    { id: 'server', label: 'Server', icon: <Server className="h-4 w-4" /> },
     { id: 'integrations', label: 'Integrations', icon: <Link2 className="h-4 w-4" /> },
   ];
 
@@ -465,6 +532,236 @@ export default function SettingsPage() {
                     <li>• Include numbers and special characters</li>
                     <li>• Don&apos;t reuse passwords from other accounts</li>
                   </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Server Connection Tab */}
+        {activeTab === 'server' && (
+          <div className="space-y-6">
+            {/* Current Connection Status */}
+            <Card className={`overflow-hidden ${connection.type === 'enterprise' ? 'ring-2 ring-purple-200' : 'ring-2 ring-blue-200'}`}>
+              <div className={`px-6 py-4 ${connection.type === 'enterprise' ? 'bg-gradient-to-r from-purple-600 to-purple-700' : 'bg-gradient-to-r from-blue-600 to-blue-700'} text-white`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {connection.type === 'enterprise' ? (
+                      <Building className="h-6 w-6" />
+                    ) : (
+                      <Cloud className="h-6 w-6" />
+                    )}
+                    <div>
+                      <h3 className="font-bold text-lg">{connection.label}</h3>
+                      <p className="text-sm opacity-90">{connection.url}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/20">
+                      <Wifi className="h-3 w-3" />
+                      {connection.type === 'enterprise' ? 'Enterprise' : 'SaaS Cloud'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Server Configuration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Server className="h-5 w-5" />
+                  Server Configuration
+                </CardTitle>
+                <CardDescription>
+                  Connect to StockScan Cloud (SaaS) or your own Enterprise server. Switching servers will require you to log in again.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Server Type Selector */}
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-3 block">Server Type</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setServerType('saas');
+                        setServerUrl(DEFAULT_SAAS_URL);
+                        setServerLabel('StockScan Cloud');
+                        setTestResult(null);
+                      }}
+                      className={`relative flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                        serverType === 'saas'
+                          ? 'border-blue-500 bg-blue-50 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <Cloud className={`h-6 w-6 mt-0.5 flex-shrink-0 ${serverType === 'saas' ? 'text-blue-600' : 'text-gray-400'}`} />
+                      <div>
+                        <p className={`font-semibold ${serverType === 'saas' ? 'text-blue-900' : 'text-gray-700'}`}>StockScan Cloud</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Managed SaaS — no setup required</p>
+                      </div>
+                      {serverType === 'saas' && (
+                        <CheckCircle2 className="absolute top-3 right-3 h-5 w-5 text-blue-500" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setServerType('enterprise');
+                        if (serverUrl === DEFAULT_SAAS_URL) {
+                          setServerUrl('');
+                          setServerLabel('');
+                        }
+                        setTestResult(null);
+                      }}
+                      className={`relative flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                        serverType === 'enterprise'
+                          ? 'border-purple-500 bg-purple-50 shadow-sm'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <Building className={`h-6 w-6 mt-0.5 flex-shrink-0 ${serverType === 'enterprise' ? 'text-purple-600' : 'text-gray-400'}`} />
+                      <div>
+                        <p className={`font-semibold ${serverType === 'enterprise' ? 'text-purple-900' : 'text-gray-700'}`}>Enterprise Server</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Self-hosted — connect to your own instance</p>
+                      </div>
+                      {serverType === 'enterprise' && (
+                        <CheckCircle2 className="absolute top-3 right-3 h-5 w-5 text-purple-500" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Server URL */}
+                <div className="space-y-2">
+                  <Label htmlFor="server-url" className="text-sm font-medium text-gray-700">
+                    API Server URL
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="server-url"
+                      type="url"
+                      value={serverUrl}
+                      onChange={(e) => { setServerUrl(e.target.value); setTestResult(null); }}
+                      placeholder={serverType === 'enterprise' ? 'https://stockscan.yourcompany.com' : DEFAULT_SAAS_URL}
+                      disabled={serverType === 'saas'}
+                      className={`flex-1 ${serverType === 'saas' ? 'bg-gray-50' : ''}`}
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={handleTestConnection}
+                      disabled={isTesting || !serverUrl.trim()}
+                      className="min-w-[120px]"
+                    >
+                      {isTesting ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Testing...</>
+                      ) : (
+                        <><Activity className="h-4 w-4 mr-2" /> Test</>
+                      )}
+                    </Button>
+                  </div>
+                  {serverType === 'saas' && (
+                    <p className="text-xs text-gray-500">The SaaS server URL is fixed and cannot be changed.</p>
+                  )}
+                </div>
+
+                {/* Test Result */}
+                {testResult && (
+                  <div className={`flex items-start gap-3 p-4 rounded-lg border ${
+                    testResult.success
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : 'bg-red-50 border-red-200 text-red-800'
+                  }`}>
+                    {testResult.success ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <WifiOff className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <p className="font-semibold text-sm">
+                        {testResult.success ? 'Connection Successful' : 'Connection Failed'}
+                      </p>
+                      {testResult.success && (
+                        <div className="text-xs mt-1 space-y-0.5">
+                          {testResult.responseTime && <p>Response time: {testResult.responseTime}ms</p>}
+                          {testResult.version && <p>API Version: {testResult.version}</p>}
+                          {testResult.serverName && <p>Server: {testResult.serverName}</p>}
+                        </div>
+                      )}
+                      {testResult.error && (
+                        <p className="text-xs mt-1">{testResult.error}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Server Label (Enterprise only) */}
+                {serverType === 'enterprise' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="server-label" className="text-sm font-medium text-gray-700">
+                      Display Name <span className="text-gray-400 font-normal">(optional)</span>
+                    </Label>
+                    <Input
+                      id="server-label"
+                      value={serverLabel}
+                      onChange={(e) => setServerLabel(e.target.value)}
+                      placeholder="e.g. Ridgeway Plant Services"
+                    />
+                    <p className="text-xs text-gray-500">A friendly name shown in the sidebar and login screen.</p>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 pt-2">
+                  <Button
+                    onClick={handleSaveServer}
+                    disabled={isSavingServer || !serverUrl.trim()}
+                    className={serverType === 'enterprise' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+                  >
+                    {isSavingServer ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+                    ) : (
+                      <><Check className="h-4 w-4 mr-2" /> Save Connection</>
+                    )}
+                  </Button>
+                  {!isDefault && serverType !== 'saas' && (
+                    <Button variant="outline" onClick={handleResetToSaaS}>
+                      <RotateCcw className="h-4 w-4 mr-2" /> Reset to Cloud
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Info Card */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex gap-3">
+                    <div className="p-2.5 rounded-lg bg-blue-50 h-fit">
+                      <Cloud className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 text-sm">StockScan Cloud (SaaS)</h4>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Fully managed service hosted by StockScan. Automatic updates, backups, and scaling. 
+                        Perfect for most businesses.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="p-2.5 rounded-lg bg-purple-50 h-fit">
+                      <Building className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 text-sm">Enterprise Server</h4>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Self-hosted on your own infrastructure. Full data sovereignty, custom integrations, 
+                        and on-premise deployment. Requires your enterprise API URL.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
