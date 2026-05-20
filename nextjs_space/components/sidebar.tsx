@@ -33,6 +33,7 @@ import {
   ScanLine,
   Cloud,
   Building,
+  Download,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -62,6 +63,7 @@ const navItems = [
   { href: '/mobile-app', label: 'Mobile App', icon: Smartphone, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/company-profile', label: 'Company Profile', icon: Building2, roles: ['MANAGER', 'OWNER'] },
   { href: '/branding', label: 'Branding', icon: Palette, roles: ['OWNER'] },
+  { href: '/download', label: 'Install App', icon: Download, roles: ['STAFF', 'MANAGER', 'OWNER'] },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['STAFF', 'MANAGER', 'OWNER'] },
 ];
 

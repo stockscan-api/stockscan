@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockScan Setup</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+      color: #f8fafc;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+    .container {
+      flex: 1;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      -webkit-app-region: no-drag;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .header p {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .logo {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+    }
+    .server-types {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .server-type {
+      padding: 16px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      background: rgba(255,255,255,0.03);
+    }
+    .server-type:hover {
+      border-color: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.06);
+    }
+    .server-type.active {
+      border-color: #3b82f6;
+      background: rgba(59,130,246,0.1);
+    }
+    .server-type.enterprise.active {
+      border-color: #a855f7;
+      background: rgba(168,85,247,0.1);
+    }
+    .server-type .icon { font-size: 28px; margin-bottom: 8px; }
+    .server-type .title { font-size: 14px; font-weight: 600; }
+    .server-type .desc { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+    
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus {
+      border-color: #3b82f6;
+    }
+    .form-group input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .form-group .hint {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .test-result {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .test-result.success {
+      display: block;
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.3);
+      color: #86efac;
+    }
+    .test-result.error {
+      display: block;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: auto;
+    }
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: #e2e8f0;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">📦</div>
+      <h1>Welcome to StockScan</h1>
+      <p>Choose how you want to connect</p>
+    </div>
+
+    <div class="server-types">
+      <div class="server-type active" id="saas-option" onclick="selectType('saas')">
+        <div class="icon">☁️</div>
+        <div class="title">StockScan Cloud</div>
+        <div class="desc">Managed SaaS — no setup</div>
+      </div>
+      <div class="server-type enterprise" id="enterprise-option" onclick="selectType('enterprise')">
+        <div class="icon">🏢</div>
+        <div class="title">Enterprise Server</div>
+        <div class="desc">Self-hosted instance</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>API Server URL</label>
+      <input type="url" id="serverUrl" value="https://api.stockscan.uk" disabled />
+      <div class="hint" id="urlHint">The SaaS URL is pre-configured.</div>
+    </div>
+
+    <div class="form-group" id="labelGroup" style="display:none">
+      <label>Display Name (optional)</label>
+      <input type="text" id="serverLabel" placeholder="e.g. Ridgeway Plant Services" />
+      <div class="hint">A friendly name for this server.</div>
+    </div>
+
+    <div id="testResult" class="test-result"></div>
+
+    <div class="actions">
+      <button class="btn btn-secondary" id="testBtn" onclick="testConnection()">Test Connection</button>
+      <button class="btn btn-primary" id="continueBtn" onclick="completeSetup()">Continue</button>
+    </div>
+  </div>
+
+  <script>
+    let currentType = 'saas';
+
+    function selectType(type) {
+      currentType = type;
+      document.getElementById('saas-option').classList.toggle('active', type === 'saas');
+      document.getElementById('enterprise-option').classList.toggle('active', type === 'enterprise');
+      
+      const urlInput = document.getElementById('serverUrl');
+      const labelGroup = document.getElementById('labelGroup');
+      const urlHint = document.getElementById('urlHint');
+      const testResult = document.getElementById('testResult');
+      
+      testResult.style.display = 'none';
+      
+      if (type === 'saas') {
+        urlInput.value = 'https://api.stockscan.uk';
+        urlInput.disabled = true;
+        urlHint.textContent = 'The SaaS URL is pre-configured.';
+        labelGroup.style.display = 'none';
+      } else {
+        urlInput.value = '';
+        urlInput.disabled = false;
+        urlInput.focus();
+        urlHint.textContent = 'Enter your enterprise StockScan API URL.';
+        labelGroup.style.display = 'block';
+      }
+    }
+
+    function testConnection() {
+      const url = document.getElementById('serverUrl').value.trim();
+      if (!url) return;
+      
+      const btn = document.getElementById('testBtn');
+      const result = document.getElementById('testResult');
+      btn.textContent = 'Testing...';
+      btn.disabled = true;
+      result.style.display = 'none';
+
+      window.electronAPI.testConnection(url);
+    }
+
+    // Listen for test results from main process
+    window.electronAPI.onTestResult((data) => {
+      const btn = document.getElementById('testBtn');
+      const result = document.getElementById('testResult');
+      btn.textContent = 'Test Connection';
+      btn.disabled = false;
+
+      if (data.success) {
+        result.className = 'test-result success';
+        result.textContent = `\u2705 Connected successfully (${data.responseTime}ms)`;
+      } else {
+        result.className = 'test-result error';
+        result.textContent = `\u274c Connection failed: ${data.error}`;
+      }
+    });
+
+    function completeSetup() {
+      const serverUrl = document.getElementById('serverUrl').value.trim();
+      if (!serverUrl) {
+        document.getElementById('serverUrl').focus();
+        return;
+      }
+      
+      const labelInput = document.getElementById('serverLabel');
+      const serverLabel = currentType === 'enterprise' 
+        ? (labelInput.value.trim() || 'Enterprise Server')
+        : 'StockScan Cloud';
+      
+      const portalUrl = currentType === 'saas' 
+        ? 'https://login.stockscan.uk' 
+        : serverUrl.replace('/api', '').replace(':3001', ':3000'); // Best-guess portal URL
+
+      window.electronAPI.completeSetup({
+        serverUrl,
+        serverLabel,
+        serverType: currentType,
+        portalUrl,
+      });
+    }
+  </script>
+</body>
+</html>
