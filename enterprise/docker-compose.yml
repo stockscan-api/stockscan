@@ -13,8 +13,6 @@
 #   API:        http://<your-server-ip>:3000
 # ──────────────────────────────────────────────────────────
 
-version: '3.8'
-
 services:
   # ── StockScan API (your existing NestJS backend) ──
   # Uncomment and configure if you want to manage the API 
