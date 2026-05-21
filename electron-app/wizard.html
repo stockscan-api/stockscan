@@ -205,6 +205,18 @@
   </div>
 
   <script>
+    // Graceful degradation if preload fails
+    if (!window.electronAPI) {
+      console.warn('[StockScan] electronAPI not available — preload may not have loaded');
+      window.electronAPI = {
+        completeSetup: function() { alert('Setup error: Please restart the application.'); },
+        testConnection: function() { alert('Test unavailable: Please restart the application.'); },
+        onTestResult: function() {},
+        getVersion: function() { return Promise.resolve('unknown'); },
+        getConfig: function() { return Promise.resolve(null); },
+      };
+    }
+
     let currentType = 'saas';
 
     function selectType(type) {

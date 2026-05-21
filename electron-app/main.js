@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, shell, ipcMain } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 
@@ -17,6 +17,15 @@ const store = new Store({
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+
+// Enable DevTools shortcut in production
+const enableDevTools = (win) => {
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12') {
+      win.webContents.toggleDevTools();
+    }
+  });
+};
 
 // ──────────────────────────────────────────────
 // First-Run Setup Wizard
@@ -40,10 +49,19 @@ function showSetupWizard() {
     });
 
     wizard.setMenuBarVisibility(false);
-    wizard.loadFile('wizard.html');
+    enableDevTools(wizard);
+
+    // Use absolute path for wizard.html — critical for packaged app
+    const wizardPath = path.join(__dirname, 'wizard.html');
+    console.log('[StockScan] Loading wizard from:', wizardPath);
+    wizard.loadFile(wizardPath);
+
+    // Handle wizard load errors
+    wizard.webContents.on('did-fail-load', (event, errorCode, errorDesc, validatedURL) => {
+      console.error('[StockScan] Wizard failed to load:', errorCode, errorDesc, validatedURL);
+    });
 
     // Listen for wizard completion via IPC
-    const { ipcMain } = require('electron');
 
     const handleWizardComplete = (event, config) => {
       store.set('serverUrl', config.serverUrl);
@@ -123,20 +141,66 @@ function createMainWindow() {
   });
 
   // Inject server connection into localStorage before loading
+  // Use JSON.stringify for safe escaping (handles quotes, apostrophes, special chars)
   mainWindow.webContents.on('did-finish-load', () => {
+    const safeServerUrl = JSON.stringify(serverUrl);
+    const safeServerLabel = JSON.stringify(serverLabel);
+    const safeServerType = JSON.stringify(serverType);
     mainWindow.webContents.executeJavaScript(`
-      localStorage.setItem('stockscan_server_url', '${serverUrl}');
-      localStorage.setItem('stockscan_server_label', '${serverLabel}');
-      localStorage.setItem('stockscan_server_type', '${serverType}');
+      try {
+        localStorage.setItem('stockscan_server_url', ${safeServerUrl});
+        localStorage.setItem('stockscan_server_label', ${safeServerLabel});
+        localStorage.setItem('stockscan_server_type', ${safeServerType});
+        console.log('[StockScan] Server config injected into localStorage');
+      } catch(e) {
+        console.error('[StockScan] Failed to set localStorage:', e);
+      }
     `);
   });
 
+  enableDevTools(mainWindow);
+
+  console.log('[StockScan] Loading portal URL:', portalUrl);
   mainWindow.loadURL(portalUrl);
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    mainWindow.focus();
+  // Handle load failures (network error, DNS, etc.)
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDesc, validatedURL) => {
+    console.error('[StockScan] Failed to load portal:', errorCode, errorDesc, validatedURL);
+    mainWindow.webContents.loadURL(`data:text/html,
+      <html>
+      <body style="font-family:system-ui;background:#0f172a;color:#f8fafc;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;text-align:center;padding:40px;">
+        <h1 style="font-size:24px;margin-bottom:12px;">Unable to Connect</h1>
+        <p style="color:#94a3b8;margin-bottom:8px;">Could not reach <strong>${portalUrl.replace(/'/g, '&#39;')}</strong></p>
+        <p style="color:#64748b;font-size:14px;">Error: ${errorDesc.replace(/'/g, '&#39;')} (${errorCode})</p>
+        <p style="color:#64748b;font-size:14px;margin-top:20px;">Check your internet connection and try again.</p>
+        <button onclick="location.href='${portalUrl.replace(/'/g, '&#39;')}'"
+                style="margin-top:24px;padding:12px 32px;background:#3b82f6;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;">
+          Retry
+        </button>
+      </body>
+      </html>
+    `);
   });
+
+  // Show window once ready, with timeout fallback
+  let windowShown = false;
+  mainWindow.once('ready-to-show', () => {
+    if (!windowShown) {
+      windowShown = true;
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  // Fallback: show window after 10 seconds even if ready-to-show hasn't fired
+  setTimeout(() => {
+    if (!windowShown && mainWindow && !mainWindow.isDestroyed()) {
+      windowShown = true;
+      console.warn('[StockScan] Showing window via timeout fallback');
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }, 10000);
 
   // Save window size on resize
   mainWindow.on('resize', () => {
@@ -330,6 +394,10 @@ function getIconPath() {
 // App Lifecycle
 // ──────────────────────────────────────────────
 app.whenReady().then(async () => {
+  // Register IPC handlers
+  ipcMain.handle('get-version', () => app.getVersion());
+  ipcMain.handle('get-config', (event, key) => store.get(key));
+
   // Show setup wizard on first run
   if (store.get('isFirstRun')) {
     const result = await showSetupWizard();
