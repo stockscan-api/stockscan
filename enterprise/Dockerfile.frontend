@@ -1,0 +1,77 @@
+# ──────────────────────────────────────────────────────────
+# StockScan Web Portal — Enterprise Frontend Container
+# ──────────────────────────────────────────────────────────
+# Multi-stage build: installs deps, builds Next.js standalone,
+# then runs a minimal production image.
+#
+# Build:
+#   docker build -f Dockerfile.frontend -t stockscan-frontend ../nextjs_space
+#
+# Run:
+#   docker run -p 3100:3000 \
+#     -e BACKEND_API_URL=http://stockscan-api:3000 \
+#     stockscan-frontend
+# ──────────────────────────────────────────────────────────
+
+# ── Stage 1: Install dependencies ──
+FROM node:18-alpine AS deps
+WORKDIR /app
+
+# Copy package manifests
+COPY package.json yarn.lock* ./
+
+# Install production + dev dependencies (need dev for build)
+RUN yarn install --frozen-lockfile --network-timeout 600000 || yarn install --network-timeout 600000
+
+# ── Stage 2: Build the application ──
+FROM node:18-alpine AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Generate Prisma client if schema exists
+RUN if [ -f prisma/schema.prisma ]; then npx prisma generate; fi
+
+# Build as standalone output for minimal production image
+ENV NEXT_OUTPUT_MODE=standalone
+ENV NEXT_DIST_DIR=.next
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
+# Build-time defaults (overridden at runtime)
+ENV BACKEND_API_URL=http://localhost:3000
+ENV NEXTAUTH_URL=http://localhost:3100
+
+RUN yarn build
+
+# ── Stage 3: Production runner ──
+FROM node:18-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Copy standalone build output
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+# Set ownership
+RUN chown -R nextjs:nodejs /app
+
+USER nextjs
+
+EXPOSE 3000
+
+# Runtime env vars (set these when running the container)
+# BACKEND_API_URL - URL of the NestJS API (e.g., http://stockscan-api:3000)
+# NEXTAUTH_URL - Public URL of this frontend (e.g., http://192.168.1.101:3100)
+
+CMD ["node", "server.js"]

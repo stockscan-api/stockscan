@@ -190,6 +190,12 @@
       <div class="hint" id="urlHint">The SaaS URL is pre-configured.</div>
     </div>
 
+    <div class="form-group" id="portalGroup" style="display:none">
+      <label>Web Portal URL</label>
+      <input type="url" id="portalUrl" placeholder="e.g. http://192.168.1.101:3100" />
+      <div class="hint">The URL of your local StockScan web portal. Leave blank to use the cloud portal.</div>
+    </div>
+
     <div class="form-group" id="labelGroup" style="display:none">
       <label>Display Name (optional)</label>
       <input type="text" id="serverLabel" placeholder="e.g. Ridgeway Plant Services" />
@@ -225,6 +231,7 @@
       document.getElementById('enterprise-option').classList.toggle('active', type === 'enterprise');
       
       const urlInput = document.getElementById('serverUrl');
+      const portalGroup = document.getElementById('portalGroup');
       const labelGroup = document.getElementById('labelGroup');
       const urlHint = document.getElementById('urlHint');
       const testResult = document.getElementById('testResult');
@@ -235,12 +242,14 @@
         urlInput.value = 'https://api.stockscan.uk';
         urlInput.disabled = true;
         urlHint.textContent = 'The SaaS URL is pre-configured.';
+        portalGroup.style.display = 'none';
         labelGroup.style.display = 'none';
       } else {
         urlInput.value = '';
         urlInput.disabled = false;
         urlInput.focus();
         urlHint.textContent = 'Enter your enterprise StockScan API URL.';
+        portalGroup.style.display = 'block';
         labelGroup.style.display = 'block';
       }
     }
@@ -282,16 +291,22 @@
       }
       
       const labelInput = document.getElementById('serverLabel');
+      const portalInput = document.getElementById('portalUrl');
       const serverLabel = currentType === 'enterprise' 
         ? (labelInput.value.trim() || 'Enterprise Server')
         : 'StockScan Cloud';
 
-      // Portal URL is always the same (login.stockscan.uk)
-      // Only the API target (serverUrl) changes between SaaS and Enterprise
+      // For enterprise: use their local portal URL if provided
+      // For SaaS: always use the cloud portal
+      const portalUrl = currentType === 'enterprise' 
+        ? (portalInput.value.trim() || '')  // Empty = use cloud portal as fallback
+        : '';
+
       window.electronAPI.completeSetup({
         serverUrl,
         serverLabel,
         serverType: currentType,
+        portalUrl: portalUrl || undefined,
       });
     }
   </script>

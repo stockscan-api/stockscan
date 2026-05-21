@@ -2,8 +2,8 @@ const { app, BrowserWindow, Menu, Tray, nativeImage, shell, ipcMain, dialog } = 
 const path = require('path');
 const Store = require('electron-store');
 
-// The web portal URL is ALWAYS the same — only the API target changes
-const PORTAL_URL = 'https://login.stockscan.uk';
+// Default SaaS portal URL
+const DEFAULT_PORTAL_URL = 'https://login.stockscan.uk';
 
 // Persistent config store
 const store = new Store({
@@ -11,10 +11,20 @@ const store = new Store({
     serverUrl: 'https://api.stockscan.uk',
     serverLabel: 'StockScan Cloud',
     serverType: 'saas',    // 'saas' | 'enterprise'
+    portalUrl: DEFAULT_PORTAL_URL,  // For enterprise: their local frontend URL
     windowBounds: { width: 1280, height: 800 },
     isFirstRun: true,
   },
 });
+
+// Get the portal URL — SaaS always uses cloud, enterprise uses stored URL
+function getPortalUrl() {
+  const type = store.get('serverType');
+  if (type === 'enterprise') {
+    return store.get('portalUrl') || DEFAULT_PORTAL_URL;
+  }
+  return DEFAULT_PORTAL_URL;
+}
 
 let mainWindow = null;
 let tray = null;
@@ -35,8 +45,8 @@ const enableDevTools = (win) => {
 function showSetupWizard() {
   return new Promise((resolve) => {
     const wizard = new BrowserWindow({
-      width: 600,
-      height: 520,
+      width: 620,
+      height: 600,
       resizable: false,
       minimizable: false,
       maximizable: false,
@@ -67,6 +77,12 @@ function showSetupWizard() {
       store.set('serverUrl', config.serverUrl);
       store.set('serverLabel', config.serverLabel);
       store.set('serverType', config.serverType);
+      // For enterprise, store the portal URL (their local frontend)
+      if (config.portalUrl) {
+        store.set('portalUrl', config.portalUrl);
+      } else if (config.serverType === 'saas') {
+        store.set('portalUrl', DEFAULT_PORTAL_URL);
+      }
       store.set('isFirstRun', false);
       wizard.close();
       resolve(config);
@@ -164,8 +180,8 @@ function createMainWindow() {
 
   enableDevTools(mainWindow);
 
-  console.log('[StockScan] Loading portal URL:', PORTAL_URL);
-  mainWindow.loadURL(PORTAL_URL);
+  console.log('[StockScan] Loading portal URL:', getPortalUrl());
+  mainWindow.loadURL(getPortalUrl());
 
   // ── Handle load failures — show a local error.html file instead of data: URL ──
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc, validatedURL) => {
@@ -210,7 +226,7 @@ function createMainWindow() {
   // Open external links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
-      if (url.startsWith('http') && !url.includes(new URL(PORTAL_URL).host)) {
+      if (url.startsWith('http') && !url.includes(new URL(getPortalUrl()).host)) {
         shell.openExternal(url);
         return { action: 'deny' };
       }
@@ -227,20 +243,20 @@ function createMainWindow() {
       submenu: [
         {
           label: 'Dashboard',
-          click: () => mainWindow.loadURL(`${PORTAL_URL}/dashboard`),
+          click: () => mainWindow.loadURL(`${getPortalUrl()}/dashboard`),
         },
         {
           label: 'Point of Sale',
-          click: () => mainWindow.loadURL(`${PORTAL_URL}/pos`),
+          click: () => mainWindow.loadURL(`${getPortalUrl()}/pos`),
         },
         {
           label: 'Products',
-          click: () => mainWindow.loadURL(`${PORTAL_URL}/products`),
+          click: () => mainWindow.loadURL(`${getPortalUrl()}/products`),
         },
         { type: 'separator' },
         {
           label: 'Server Settings',
-          click: () => mainWindow.loadURL(`${PORTAL_URL}/settings`),
+          click: () => mainWindow.loadURL(`${getPortalUrl()}/settings`),
         },
         { type: 'separator' },
         {
@@ -300,7 +316,7 @@ function createMainWindow() {
             if (result) {
               // Reload with new config
               if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.loadURL(PORTAL_URL);
+                mainWindow.loadURL(getPortalUrl());
                 mainWindow.show();
               } else {
                 createMainWindow();
@@ -391,7 +407,7 @@ function createTray() {
       click: () => {
         
         if (mainWindow) {
-          mainWindow.loadURL(`${PORTAL_URL}/dashboard`);
+          mainWindow.loadURL(`${getPortalUrl()}/dashboard`);
           mainWindow.show();
         }
       },
@@ -401,7 +417,7 @@ function createTray() {
       click: () => {
         
         if (mainWindow) {
-          mainWindow.loadURL(`${PORTAL_URL}/pos`);
+          mainWindow.loadURL(`${getPortalUrl()}/pos`);
           mainWindow.show();
         }
       },

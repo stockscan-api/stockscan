@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const DEFAULT_BACKEND_URL = 'https://api.stockscan.uk';
+export const dynamic = 'force-dynamic';
+
+// For enterprise Docker deployments, set BACKEND_API_URL env var to point to the local API
+// For SaaS, this defaults to the cloud API
+const DEFAULT_BACKEND_URL = process.env.BACKEND_API_URL || 'https://api.stockscan.uk';
 
 function getBackendUrl(request: NextRequest): string {
-  // Read custom backend URL from header (set by client-side api-client)
+  // 1. Read custom backend URL from header (set by client-side api-client for multi-server support)
   const customUrl = request.headers.get('x-backend-url');
   if (customUrl && customUrl.startsWith('http')) {
     return customUrl.replace(/\/+$/, '');
   }
+  // 2. Fall back to env var or default SaaS URL
   return DEFAULT_BACKEND_URL;
 }
 

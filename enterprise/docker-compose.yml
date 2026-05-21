@@ -1,0 +1,61 @@
+# ──────────────────────────────────────────────────────────
+# StockScan Enterprise — Full Stack Docker Compose
+# ──────────────────────────────────────────────────────────
+# This runs both the NestJS API and the Web Portal frontend
+# together on a single machine. Edit the environment variables
+# below to match your setup.
+#
+# Usage:
+#   docker-compose up -d
+#
+# Access:
+#   Web Portal: http://<your-server-ip>:3100
+#   API:        http://<your-server-ip>:3000
+# ──────────────────────────────────────────────────────────
+
+version: '3.8'
+
+services:
+  # ── StockScan API (your existing NestJS backend) ──
+  # Uncomment and configure if you want to manage the API 
+  # via this compose file. Otherwise, leave it commented
+  # and point BACKEND_API_URL to your existing API container.
+  #
+  # stockscan-api:
+  #   image: stockscan-api:latest
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - DATABASE_URL=postgresql://user:pass@db:5432/stockscan
+  #     - JWT_SECRET=your-jwt-secret
+  #   restart: unless-stopped
+  #   networks:
+  #     - stockscan-net
+
+  # ── StockScan Web Portal (frontend) ──
+  stockscan-frontend:
+    build:
+      context: ../nextjs_space
+      dockerfile: ../enterprise/Dockerfile.frontend
+    image: stockscan-frontend:latest
+    ports:
+      - "3100:3000"
+    environment:
+      # Point to your NestJS API — use Docker service name if in same compose,
+      # or the actual IP/hostname if the API runs separately
+      - BACKEND_API_URL=http://host.docker.internal:3000
+      
+      # The public URL users will access the frontend on
+      - NEXTAUTH_URL=http://localhost:3100
+      
+      # Set to the same JWT secret as your API for token compatibility
+      - NEXTAUTH_SECRET=stockscan-enterprise-secret-change-me
+    restart: unless-stopped
+    # networks:
+    #   - stockscan-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+# networks:
+#   stockscan-net:
+#     driver: bridge
