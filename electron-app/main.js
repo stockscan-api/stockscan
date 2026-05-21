@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, shell, ipcMain, dialog } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 
@@ -18,9 +18,9 @@ let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 
-// Enable DevTools shortcut in production
+// Enable DevTools shortcut (F12) in any window
 const enableDevTools = (win) => {
-  win.webContents.on('before-input-event', (event, input) => {
+  win.webContents.on('before-input-event', (_event, input) => {
     if (input.key === 'F12') {
       win.webContents.toggleDevTools();
     }
@@ -41,6 +41,7 @@ function showSetupWizard() {
       fullscreenable: false,
       title: 'StockScan Setup',
       icon: getIconPath(),
+      show: true, // Show immediately so user sees something
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
@@ -51,19 +52,16 @@ function showSetupWizard() {
     wizard.setMenuBarVisibility(false);
     enableDevTools(wizard);
 
-    // Use absolute path for wizard.html — critical for packaged app
+    // Use absolute path — critical for packaged app
     const wizardPath = path.join(__dirname, 'wizard.html');
     console.log('[StockScan] Loading wizard from:', wizardPath);
     wizard.loadFile(wizardPath);
 
-    // Handle wizard load errors
-    wizard.webContents.on('did-fail-load', (event, errorCode, errorDesc, validatedURL) => {
-      console.error('[StockScan] Wizard failed to load:', errorCode, errorDesc, validatedURL);
+    wizard.webContents.on('did-fail-load', (_ev, code, desc) => {
+      console.error('[StockScan] Wizard failed to load:', code, desc);
     });
 
-    // Listen for wizard completion via IPC
-
-    const handleWizardComplete = (event, config) => {
+    const handleWizardComplete = (_event, config) => {
       store.set('serverUrl', config.serverUrl);
       store.set('serverLabel', config.serverLabel);
       store.set('serverType', config.serverType);
@@ -78,7 +76,7 @@ function showSetupWizard() {
         const { net } = require('electron');
         const startTime = Date.now();
         const request = net.request(`${url.replace(/\/+$/, '')}/api/health`);
-        
+
         request.on('response', (response) => {
           let body = '';
           response.on('data', (chunk) => { body += chunk.toString(); });
@@ -92,11 +90,11 @@ function showSetupWizard() {
             }
           });
         });
-        
+
         request.on('error', (err) => {
           event.reply('wizard-test-result', { success: false, error: err.message });
         });
-        
+
         request.end();
       } catch (err) {
         event.reply('wizard-test-result', { success: false, error: err.message });
@@ -137,12 +135,18 @@ function createMainWindow() {
       nodeIntegration: false,
       spellcheck: true,
     },
-    show: false, // Show after ready-to-show
+    show: false, // Show after ready-to-show or timeout
   });
 
-  // Inject server connection into localStorage before loading
-  // Use JSON.stringify for safe escaping (handles quotes, apostrophes, special chars)
+  // ── localStorage injection ──
+  // ONLY inject when we are on the actual portal domain, NOT on error/data/file pages
   mainWindow.webContents.on('did-finish-load', () => {
+    const currentUrl = mainWindow.webContents.getURL();
+    // Skip injection for non-http pages (data: urls, file: urls, error pages, about:blank)
+    if (!currentUrl.startsWith('http://') && !currentUrl.startsWith('https://')) {
+      console.log('[StockScan] Skipping localStorage injection for:', currentUrl.substring(0, 50));
+      return;
+    }
     const safeServerUrl = JSON.stringify(serverUrl);
     const safeServerLabel = JSON.stringify(serverLabel);
     const safeServerType = JSON.stringify(serverType);
@@ -155,7 +159,7 @@ function createMainWindow() {
       } catch(e) {
         console.error('[StockScan] Failed to set localStorage:', e);
       }
-    `);
+    `).catch(() => {}); // Swallow if page navigated away
   });
 
   enableDevTools(mainWindow);
@@ -163,49 +167,36 @@ function createMainWindow() {
   console.log('[StockScan] Loading portal URL:', portalUrl);
   mainWindow.loadURL(portalUrl);
 
-  // Handle load failures (network error, DNS, etc.)
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDesc, validatedURL) => {
+  // ── Handle load failures — show a local error.html file instead of data: URL ──
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc, validatedURL) => {
     console.error('[StockScan] Failed to load portal:', errorCode, errorDesc, validatedURL);
-    mainWindow.webContents.loadURL(`data:text/html,
-      <html>
-      <body style="font-family:system-ui;background:#0f172a;color:#f8fafc;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;text-align:center;padding:40px;">
-        <h1 style="font-size:24px;margin-bottom:12px;">Unable to Connect</h1>
-        <p style="color:#94a3b8;margin-bottom:8px;">Could not reach <strong>${portalUrl.replace(/'/g, '&#39;')}</strong></p>
-        <p style="color:#64748b;font-size:14px;">Error: ${errorDesc.replace(/'/g, '&#39;')} (${errorCode})</p>
-        <p style="color:#64748b;font-size:14px;margin-top:20px;">Check your internet connection and try again.</p>
-        <button onclick="location.href='${portalUrl.replace(/'/g, '&#39;')}'"
-                style="margin-top:24px;padding:12px 32px;background:#3b82f6;color:white;border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;">
-          Retry
-        </button>
-      </body>
-      </html>
-    `);
+    // Load the bundled error page
+    mainWindow.loadFile(path.join(__dirname, 'error.html'));
   });
 
-  // Show window once ready, with timeout fallback
+  // ── Show window: ready-to-show + timeout fallback ──
   let windowShown = false;
-  mainWindow.once('ready-to-show', () => {
-    if (!windowShown) {
+  const showWindow = () => {
+    if (!windowShown && mainWindow && !mainWindow.isDestroyed()) {
       windowShown = true;
       mainWindow.show();
       mainWindow.focus();
     }
-  });
-
-  // Fallback: show window after 10 seconds even if ready-to-show hasn't fired
+  };
+  mainWindow.once('ready-to-show', showWindow);
   setTimeout(() => {
-    if (!windowShown && mainWindow && !mainWindow.isDestroyed()) {
-      windowShown = true;
+    if (!windowShown) {
       console.warn('[StockScan] Showing window via timeout fallback');
-      mainWindow.show();
-      mainWindow.focus();
+      showWindow();
     }
   }, 10000);
 
   // Save window size on resize
   mainWindow.on('resize', () => {
-    const [width, height] = mainWindow.getSize();
-    store.set('windowBounds', { width, height });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const [width, height] = mainWindow.getSize();
+      store.set('windowBounds', { width, height });
+    }
   });
 
   // Minimize to tray instead of closing
@@ -218,14 +209,18 @@ function createMainWindow() {
 
   // Open external links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http') && !url.includes(new URL(portalUrl).host)) {
-      shell.openExternal(url);
-      return { action: 'deny' };
+    try {
+      if (url.startsWith('http') && !url.includes(new URL(portalUrl).host)) {
+        shell.openExternal(url);
+        return { action: 'deny' };
+      }
+    } catch (e) {
+      console.error('[StockScan] URL handler error:', e);
     }
     return { action: 'allow' };
   });
 
-  // Application menu
+  // ── Application menu ──
   const menuTemplate = [
     {
       label: 'StockScan',
@@ -294,22 +289,72 @@ function createMainWindow() {
       label: 'Help',
       submenu: [
         {
+          label: 'Run Setup Wizard...',
+          click: async () => {
+            // Re-run setup wizard from the menu
+            store.set('isFirstRun', true);
+            if (mainWindow) {
+              mainWindow.hide();
+            }
+            const result = await showSetupWizard();
+            if (result) {
+              // Reload with new config
+              if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.loadURL(store.get('portalUrl'));
+                mainWindow.show();
+              } else {
+                createMainWindow();
+              }
+            } else if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.show();
+            }
+          },
+        },
+        {
+          label: 'Reset All Settings',
+          click: () => {
+            dialog.showMessageBox(mainWindow, {
+              type: 'warning',
+              title: 'Reset Settings',
+              message: 'Reset all StockScan settings?',
+              detail: 'This will clear your server configuration and show the setup wizard on next launch.',
+              buttons: ['Cancel', 'Reset'],
+              defaultId: 0,
+              cancelId: 0,
+            }).then(({ response }) => {
+              if (response === 1) {
+                store.clear();
+                app.relaunch();
+                app.exit(0);
+              }
+            });
+          },
+        },
+        { type: 'separator' },
+        {
           label: 'About StockScan',
           click: () => {
-            const { dialog } = require('electron');
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About StockScan',
               message: `StockScan Desktop v${app.getVersion()}`,
-              detail: `Server: ${serverLabel}\nURL: ${serverUrl}\nType: ${serverType === 'enterprise' ? 'Enterprise' : 'SaaS Cloud'}`,
+              detail: `Server: ${serverLabel}\nURL: ${serverUrl}\nType: ${serverType === 'enterprise' ? 'Enterprise' : 'SaaS Cloud'}\n\nConfig location: ${store.path}`,
             });
           },
         },
         {
           label: 'Check for Updates',
           click: () => {
-            const { autoUpdater } = require('electron-updater');
-            autoUpdater.checkForUpdatesAndNotify();
+            try {
+              const { autoUpdater } = require('electron-updater');
+              autoUpdater.checkForUpdatesAndNotify();
+            } catch (e) {
+              dialog.showMessageBox(mainWindow, {
+                type: 'info',
+                title: 'Updates',
+                message: 'Auto-updater not available in this build.',
+              });
+            }
           },
         },
       ],
@@ -396,13 +441,12 @@ function getIconPath() {
 app.whenReady().then(async () => {
   // Register IPC handlers
   ipcMain.handle('get-version', () => app.getVersion());
-  ipcMain.handle('get-config', (event, key) => store.get(key));
+  ipcMain.handle('get-config', (_event, key) => store.get(key));
 
   // Show setup wizard on first run
   if (store.get('isFirstRun')) {
     const result = await showSetupWizard();
     if (!result) {
-      // User closed wizard without completing
       app.quit();
       return;
     }
