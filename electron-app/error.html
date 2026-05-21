@@ -53,16 +53,7 @@
 
   <script>
     document.getElementById('retryBtn').addEventListener('click', function() {
-      // Ask main process for the portal URL and reload
-      if (window.electronAPI && window.electronAPI.getConfig) {
-        window.electronAPI.getConfig('portalUrl').then(function(url) {
-          window.location.href = url || 'https://login.stockscan.uk';
-        }).catch(function() {
-          window.location.href = 'https://login.stockscan.uk';
-        });
-      } else {
-        window.location.href = 'https://login.stockscan.uk';
-      }
+      window.location.href = 'https://login.stockscan.uk';
     });
 
     document.getElementById('quitBtn').addEventListener('click', function() {

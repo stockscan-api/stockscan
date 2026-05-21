@@ -285,16 +285,13 @@
       const serverLabel = currentType === 'enterprise' 
         ? (labelInput.value.trim() || 'Enterprise Server')
         : 'StockScan Cloud';
-      
-      const portalUrl = currentType === 'saas' 
-        ? 'https://login.stockscan.uk' 
-        : serverUrl.replace('/api', '').replace(':3001', ':3000'); // Best-guess portal URL
 
+      // Portal URL is always the same (login.stockscan.uk)
+      // Only the API target (serverUrl) changes between SaaS and Enterprise
       window.electronAPI.completeSetup({
         serverUrl,
         serverLabel,
         serverType: currentType,
-        portalUrl,
       });
     }
   </script>

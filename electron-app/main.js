@@ -2,13 +2,15 @@ const { app, BrowserWindow, Menu, Tray, nativeImage, shell, ipcMain, dialog } = 
 const path = require('path');
 const Store = require('electron-store');
 
+// The web portal URL is ALWAYS the same — only the API target changes
+const PORTAL_URL = 'https://login.stockscan.uk';
+
 // Persistent config store
 const store = new Store({
   defaults: {
     serverUrl: 'https://api.stockscan.uk',
     serverLabel: 'StockScan Cloud',
     serverType: 'saas',    // 'saas' | 'enterprise'
-    portalUrl: 'https://login.stockscan.uk',
     windowBounds: { width: 1280, height: 800 },
     isFirstRun: true,
   },
@@ -65,7 +67,6 @@ function showSetupWizard() {
       store.set('serverUrl', config.serverUrl);
       store.set('serverLabel', config.serverLabel);
       store.set('serverType', config.serverType);
-      store.set('portalUrl', config.portalUrl || 'https://login.stockscan.uk');
       store.set('isFirstRun', false);
       wizard.close();
       resolve(config);
@@ -117,7 +118,6 @@ function showSetupWizard() {
 // ──────────────────────────────────────────────
 function createMainWindow() {
   const bounds = store.get('windowBounds');
-  const portalUrl = store.get('portalUrl');
   const serverUrl = store.get('serverUrl');
   const serverLabel = store.get('serverLabel');
   const serverType = store.get('serverType');
@@ -164,8 +164,8 @@ function createMainWindow() {
 
   enableDevTools(mainWindow);
 
-  console.log('[StockScan] Loading portal URL:', portalUrl);
-  mainWindow.loadURL(portalUrl);
+  console.log('[StockScan] Loading portal URL:', PORTAL_URL);
+  mainWindow.loadURL(PORTAL_URL);
 
   // ── Handle load failures — show a local error.html file instead of data: URL ──
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDesc, validatedURL) => {
@@ -210,7 +210,7 @@ function createMainWindow() {
   // Open external links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
-      if (url.startsWith('http') && !url.includes(new URL(portalUrl).host)) {
+      if (url.startsWith('http') && !url.includes(new URL(PORTAL_URL).host)) {
         shell.openExternal(url);
         return { action: 'deny' };
       }
@@ -227,20 +227,20 @@ function createMainWindow() {
       submenu: [
         {
           label: 'Dashboard',
-          click: () => mainWindow.loadURL(`${portalUrl}/dashboard`),
+          click: () => mainWindow.loadURL(`${PORTAL_URL}/dashboard`),
         },
         {
           label: 'Point of Sale',
-          click: () => mainWindow.loadURL(`${portalUrl}/pos`),
+          click: () => mainWindow.loadURL(`${PORTAL_URL}/pos`),
         },
         {
           label: 'Products',
-          click: () => mainWindow.loadURL(`${portalUrl}/products`),
+          click: () => mainWindow.loadURL(`${PORTAL_URL}/products`),
         },
         { type: 'separator' },
         {
           label: 'Server Settings',
-          click: () => mainWindow.loadURL(`${portalUrl}/settings`),
+          click: () => mainWindow.loadURL(`${PORTAL_URL}/settings`),
         },
         { type: 'separator' },
         {
@@ -300,7 +300,7 @@ function createMainWindow() {
             if (result) {
               // Reload with new config
               if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.loadURL(store.get('portalUrl'));
+                mainWindow.loadURL(PORTAL_URL);
                 mainWindow.show();
               } else {
                 createMainWindow();
@@ -389,9 +389,9 @@ function createTray() {
     {
       label: 'Dashboard',
       click: () => {
-        const portalUrl = store.get('portalUrl');
+        
         if (mainWindow) {
-          mainWindow.loadURL(`${portalUrl}/dashboard`);
+          mainWindow.loadURL(`${PORTAL_URL}/dashboard`);
           mainWindow.show();
         }
       },
@@ -399,9 +399,9 @@ function createTray() {
     {
       label: 'Point of Sale',
       click: () => {
-        const portalUrl = store.get('portalUrl');
+        
         if (mainWindow) {
-          mainWindow.loadURL(`${portalUrl}/pos`);
+          mainWindow.loadURL(`${PORTAL_URL}/pos`);
           mainWindow.show();
         }
       },
