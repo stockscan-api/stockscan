@@ -113,15 +113,95 @@ If you add both containers to the same Docker network:
 - `BACKEND_API_URL=http://stockscan-api:3000` (using the service name)
 - Uncomment the `networks` section in `docker-compose.yml`
 
+## Helper Scripts
+
+### `build.sh` — Build Docker image locally
+```bash
+./build.sh                  # Build with 'latest' tag
+./build.sh 1.2.0            # Build with specific version
+./build.sh 1.2.0 --push     # Build and push to registry
+```
+
+### `deploy.sh` — One-command deploy & manage
+```bash
+./deploy.sh                 # Build + start (first time creates .env from template)
+./deploy.sh --rebuild       # Force rebuild from scratch
+./deploy.sh --stop          # Stop the frontend
+./deploy.sh --logs          # View live logs
+./deploy.sh --status        # Check if frontend is running
+```
+
+## CI/CD — Automated Docker Builds
+
+### GitHub Actions (recommended)
+
+A workflow is provided at `.github/workflows/build-frontend.yml` that automatically builds and pushes the frontend Docker image to **GitHub Container Registry** (ghcr.io).
+
+#### Setup
+
+1. **Repository structure** — Your repo should look like:
+   ```
+   your-repo/
+   ├── nextjs_space/          ← Frontend source code
+   ├── enterprise/
+   │   ├── Dockerfile.frontend
+   │   ├── docker-compose.yml
+   │   ├── .github/workflows/build-frontend.yml
+   │   └── ...
+   └── ...
+   ```
+   
+   Copy the `.github/` folder from `enterprise/.github/` to your repo root:
+   ```bash
+   cp -r enterprise/.github .github
+   ```
+
+2. **Enable GitHub Packages** — Go to your repo → Settings → Actions → General → Workflow permissions → set to "Read and write permissions"
+
+3. **Triggers**:
+   - **Push to `main`** — Automatically builds and pushes `latest` tag
+   - **Git tag `v*.*.*`** — Builds a versioned release (e.g., `v1.2.0` → tag `1.2.0`)
+   - **Manual dispatch** — Click "Run workflow" in the Actions tab with optional version
+
+4. **Pull on your enterprise server**:
+   ```bash
+   # First time: login to GHCR
+   echo $GITHUB_TOKEN | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+   
+   # Pull and run
+   docker pull ghcr.io/your-org/stockscan-frontend:latest
+   docker-compose up -d
+   ```
+
+#### Using a pre-built image in docker-compose
+
+Update `docker-compose.yml` to use the registry image instead of building locally:
+```yaml
+stockscan-frontend:
+  image: ghcr.io/your-org/stockscan-frontend:latest
+  # Remove the 'build' section
+  ports:
+    - "3100:3000"
+  environment:
+    - BACKEND_API_URL=http://host.docker.internal:3000
+    - NEXTAUTH_URL=http://your-server:3100
+    - NEXTAUTH_SECRET=your-secret
+```
+
+This means your enterprise servers only need Docker — no Node.js, no source code, no build step.
+
 ## Updating the Frontend
 
-To update to a new version:
-
+### Option A: Automated (CI/CD)
+Push to `main` → GitHub Actions builds → Pull on enterprise server:
 ```bash
-# Rebuild the image
-docker build -f Dockerfile.frontend -t stockscan-frontend ../nextjs_space
+docker pull ghcr.io/your-org/stockscan-frontend:latest
+docker-compose down && docker-compose up -d
+```
 
-# Restart
+### Option B: Manual
+```bash
+./build.sh 1.3.0
 docker-compose down && docker-compose up -d
 ```
 
