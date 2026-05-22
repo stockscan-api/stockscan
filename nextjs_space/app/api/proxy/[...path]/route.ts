@@ -79,8 +79,15 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
   const fullUrl = searchParams ? `${url}?${searchParams}` : url;
   
   try {
+    console.log(`[Proxy] ${request.method} ${fullUrl}`);
+    console.log(`[Proxy] Auth header present: ${!!headers['Authorization']}`);
+    
     const response = await fetch(fullUrl, fetchOptions);
     const data = await response.text();
+    
+    if (response.status >= 400) {
+      console.error(`[Proxy] Backend returned ${response.status} for ${fullUrl}: ${data.substring(0, 500)}`);
+    }
     
     return new NextResponse(data, {
       status: response.status,
@@ -89,7 +96,7 @@ async function proxyRequest(request: NextRequest, pathSegments: string[]) {
       },
     });
   } catch (error: any) {
-    console.error('Proxy error:', error);
+    console.error(`[Proxy] Connection failed for ${fullUrl}:`, error.message);
     return NextResponse.json(
       { error: 'Failed to connect to backend', details: error.message },
       { status: 502 }
