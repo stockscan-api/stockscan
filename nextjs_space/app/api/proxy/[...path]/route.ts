@@ -4,15 +4,22 @@ export const dynamic = 'force-dynamic';
 
 // For enterprise Docker deployments, set BACKEND_API_URL env var to point to the local API
 // For SaaS, this defaults to the cloud API
-const DEFAULT_BACKEND_URL = process.env.BACKEND_API_URL || 'https://api.stockscan.uk';
+const ENV_BACKEND_URL = process.env.BACKEND_API_URL;
+const DEFAULT_BACKEND_URL = ENV_BACKEND_URL || 'https://api.stockscan.uk';
 
 function getBackendUrl(request: NextRequest): string {
-  // 1. Read custom backend URL from header (set by client-side api-client for multi-server support)
+  // In enterprise Docker mode (BACKEND_API_URL explicitly set), always use the env var
+  // This prevents client-side overrides from redirecting to the wrong API
+  if (ENV_BACKEND_URL) {
+    return ENV_BACKEND_URL.replace(/\/+$/, '');
+  }
+  
+  // For SaaS mode: allow client-side server switching via header
   const customUrl = request.headers.get('x-backend-url');
   if (customUrl && customUrl.startsWith('http')) {
     return customUrl.replace(/\/+$/, '');
   }
-  // 2. Fall back to env var or default SaaS URL
+  
   return DEFAULT_BACKEND_URL;
 }
 
