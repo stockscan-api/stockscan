@@ -1,138 +1,102 @@
 # StockScan Desktop Application
 
-Electron wrapper for the StockScan web portal. Provides a native desktop experience with system tray integration, auto-updates, and first-run server configuration.
+Native desktop wrapper for the StockScan web portal, built with Electron.
 
-## Prerequisites
+## Features
 
-- **Node.js** 18+ (LTS recommended)
-- **npm** or **yarn**
-- For Windows builds: Windows 10/11 or a CI environment with Windows runner
-- For macOS builds: macOS or CI with macOS runner (code signing requires Apple Developer cert)
+- **Native installer** — Windows `.exe` with Start Menu & Desktop shortcuts
+- **Setup wizard** — First-run configuration for SaaS or Enterprise mode
+- **Enterprise support** — Connect to self-hosted StockScan servers
+- **System tray** — Minimize to tray, quick access
+- **Auto-updates** — Built-in update mechanism via GitHub Releases
+- **Offline error handling** — Friendly error page when connection drops
 
-## Quick Start
+## Quick Start (Development)
 
 ```bash
-# Install dependencies
+cd electron-app
 npm install
-
-# Run in development mode
-npm run dev
-
-# Build for Windows
-npm run build:win
-
-# Build for all platforms
-npm run build:all
+npm start
 ```
+
+## Building the Installer
+
+### Unsigned Build (for testing)
+
+```bash
+npm run build:win:unsigned
+```
+
+Output: `dist/StockScan-Setup-1.0.0.exe`
+
+### Signed Build (for distribution)
+
+See [CODE_SIGNING.md](./CODE_SIGNING.md) for full instructions on:
+1. Getting a code signing certificate
+2. Configuring GitHub Actions for automated builds
+3. Building locally with signing
+
+### Automated Builds via GitHub Actions
+
+Push the `electron-app/` folder to a GitHub repo and:
+
+```bash
+# Tag a release to trigger automated build
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Or use manual dispatch from the Actions tab.
 
 ## Project Structure
 
 ```
 electron-app/
-├── main.js              # Main process - window management, tray, menu
-├── preload.js           # Preload script - secure IPC bridge
-├── wizard.html          # First-run setup wizard UI
-├── package.json         # Dependencies + electron-builder config
+├── main.js              # Electron main process
+├── preload.js           # Preload script (context bridge)
+├── wizard.html          # First-run setup wizard
+├── error.html           # Connection error page
+├── package.json         # Dependencies & electron-builder config
+├── CODE_SIGNING.md      # Code signing certificate guide
 ├── assets/
 │   ├── icon.ico         # Windows icon (256x256 multi-size)
-│   ├── icon.icns        # macOS icon
-│   └── icon.png         # Linux icon (512x512)
-└── README.md
+│   └── icon.png         # PNG icon (512x512)
+└── .github/
+    └── workflows/
+        └── build-desktop.yml  # CI/CD for building installers
 ```
 
-## How It Works
+## Configuration
 
-### First-Run Wizard
-On first launch, a setup wizard appears letting users choose:
-- **StockScan Cloud (SaaS)** — Pre-configured, connects to `api.stockscan.uk`
-- **Enterprise Server** — User enters their self-hosted API URL
-
-The wizard includes a "Test Connection" button and stores the configuration in `electron-store` (persisted to `%APPDATA%/stockscan-desktop/config.json`).
-
-### Server Connection
-The desktop app injects the server configuration into `localStorage` when the portal loads, which the web app’s `ServerConnectionContext` picks up automatically. This means:
-- The same web portal code runs in both browser and desktop
-- Server settings from the wizard are automatically applied
-- Users can also change servers via Settings → Server tab in the portal
-
-### System Tray
-The app minimizes to the system tray on close (instead of quitting). The tray menu provides quick access to Dashboard, POS, and Quit.
-
-### Auto-Updates
-Uses `electron-updater` with a generic provider. Set the `publish.url` in `package.json` to your release server.
-
-## Building the Installer
-
-### Windows (.exe / NSIS installer)
-```bash
-npm run build:win
-```
-Outputs to `dist/` directory:
-- `StockScan Setup 1.0.0.exe` — NSIS installer
-- `StockScan 1.0.0.exe` — Portable executable
-
-### macOS (.dmg)
-```bash
-npm run build:mac
-```
-Note: Code signing requires `CSC_LINK` and `CSC_KEY_PASSWORD` environment variables.
-
-### Linux (.AppImage / .deb)
-```bash
-npm run build:linux
-```
-
-## Icons
-
-Before building, place your app icons in the `assets/` directory:
-- `icon.ico` — Windows (256x256 multi-resolution ICO)
-- `icon.icns` — macOS (use `iconutil` to create from iconset)
-- `icon.png` — Linux (512x512 PNG)
-
-You can generate these from the StockScan logo using:
-```bash
-# From the project root
-convert ../nextjs_space/public/logo.png -resize 512x512 assets/icon.png
-convert ../nextjs_space/public/logo.png -resize 256x256 assets/icon.ico
-# For macOS icns, use iconutil on macOS
-```
-
-## Configuration Storage
-
-Settings are stored via `electron-store` at:
+The app stores configuration in the system's app data directory:
 - **Windows**: `%APPDATA%/stockscan-desktop/config.json`
 - **macOS**: `~/Library/Application Support/stockscan-desktop/config.json`
 - **Linux**: `~/.config/stockscan-desktop/config.json`
 
-## CI/CD Integration
+Settings:
+| Key | Default | Description |
+|---|---|---|
+| `serverUrl` | `https://api.stockscan.uk` | Backend API URL |
+| `serverLabel` | `StockScan Cloud` | Display name for the server |
+| `serverType` | `saas` | `saas` or `enterprise` |
+| `portalUrl` | `https://login.stockscan.uk` | Web portal URL to load |
 
-For automated builds, use GitHub Actions with `electron-builder`:
+## Enterprise Mode
 
-```yaml
-# .github/workflows/build.yml
-name: Build Desktop App
-on:
-  push:
-    tags: ['v*']
-jobs:
-  build:
-    strategy:
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm install
-      - run: npm run build:${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'macos-latest' && 'mac' || 'linux' }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: desktop-${{ matrix.os }}
-          path: dist/*
-```
+For self-hosted deployments:
+1. Run the setup wizard (first launch or Help → Run Setup Wizard)
+2. Select "Enterprise / Self-Hosted"
+3. Enter your server's API URL and Web Portal URL
+4. Test the connection and save
 
-## Version Matching
+## Updating the Version
 
-Keep the desktop app version in sync with the web portal. Update `version` in `package.json` before each release.
+1. Update `version` in `package.json`
+2. Commit and tag:
+   ```bash
+   git add -A
+   git commit -m "Release v1.1.0"
+   git tag v1.1.0
+   git push origin main --tags
+   ```
+3. GitHub Actions will build and create a release automatically

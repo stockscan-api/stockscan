@@ -233,30 +233,60 @@ export default function DownloadPage() {
             <h2 className="text-lg font-semibold text-gray-900">Installation Options</h2>
 
             <div className="grid gap-4">
-              {/* Windows Desktop App (Coming Soon) */}
-              {isDesktop && (
+              {/* Windows Desktop App */}
+              {isDesktop && os?.isWindows && (
+                <Card className="ring-2 ring-slate-200 overflow-hidden">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200">
+                        <Monitor className="h-6 w-6 text-slate-700" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900">Windows Desktop Application</h3>
+                          <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">v1.0.0</Badge>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Standalone Windows installer with native integration — system tray, auto-updates, and enterprise server support.
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {['System tray', 'Auto-updates', 'Enterprise mode', 'Setup wizard', 'Native window'].map(f => (
+                            <span key={f} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{f}</span>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-3 mt-4">
+                          <a href="https://github.com/ArtisanByteCrafter/StockScan/releases/latest/download/StockScan-Setup-1.0.0.exe" target="_blank" rel="noopener noreferrer">
+                            <Button className="bg-slate-800 hover:bg-slate-900 text-white">
+                              <Download className="h-4 w-4 mr-2" /> Download StockScan Setup
+                            </Button>
+                          </a>
+                          <span className="text-xs text-gray-400">~80 MB · Windows 10/11</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                          <Shield className="h-3 w-3" /> Signed by StockScan Ltd · SHA-256 verified
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Desktop (non-Windows) */}
+              {isDesktop && !os?.isWindows && (
                 <Card className="relative overflow-hidden">
                   <div className="absolute top-3 right-3">
-                    <Badge className="bg-amber-100 text-amber-700 border-amber-200">Coming Soon</Badge>
+                    <Badge className="bg-amber-100 text-amber-700 border-amber-200">Windows Only</Badge>
                   </div>
                   <CardContent className="pt-6">
                     <div className="flex items-start gap-4">
                       <div className="p-3 rounded-xl bg-slate-100">
-                        <HardDrive className="h-6 w-6 text-slate-700" />
+                        <Monitor className="h-6 w-6 text-slate-700" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">Windows Desktop Application</h3>
+                        <h3 className="font-semibold text-gray-900">Desktop Application</h3>
                         <p className="text-sm text-gray-500 mt-1">
-                          A standalone .exe installer with native Windows integration — system tray, auto-updates, and hardware barcode scanner support.
+                          The native desktop app is currently available for Windows. Use the PWA install option above for {os?.name || 'your OS'} — it provides a very similar experience.
                         </p>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {['System tray', 'Auto-updates', 'Barcode scanner HW', 'Offline mode'].map(f => (
-                            <span key={f} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{f}</span>
-                          ))}
-                        </div>
-                        <Button variant="outline" disabled className="mt-4 opacity-60">
-                          <Download className="h-4 w-4 mr-2" /> Download .exe — Coming Soon
-                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -414,7 +444,7 @@ export default function DownloadPage() {
                       <div className="flex flex-col items-center gap-1">
                         <HardDrive className="h-4 w-4 text-slate-500" />
                         <span>Desktop App</span>
-                        <Badge className="text-[10px] bg-amber-100 text-amber-700 border-amber-200">Soon</Badge>
+                        <Badge className="text-[10px] bg-blue-100 text-blue-700 border-blue-200">Windows</Badge>
                       </div>
                     </th>
                   </tr>

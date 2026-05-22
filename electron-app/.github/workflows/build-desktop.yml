@@ -1,0 +1,94 @@
+# ──────────────────────────────────────────────────────────
+# StockScan Desktop — Build Signed Windows Installer
+# ──────────────────────────────────────────────────────────
+# Triggers on version tags (v1.0.0, v1.2.3, etc.) or manual dispatch.
+# Builds a signed .exe installer and uploads to GitHub Releases.
+#
+# Required GitHub Secrets:
+#   WIN_CSC_LINK        - Base64-encoded .pfx code signing certificate
+#   WIN_CSC_KEY_PASSWORD - Password for the .pfx certificate
+#
+# To build WITHOUT signing (for testing), use the manual dispatch
+# and set 'skip_signing' to true.
+# ──────────────────────────────────────────────────────────
+
+name: Build Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      skip_signing:
+        description: 'Build without code signing (for testing)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build signed Windows installer
+        if: ${{ github.event.inputs.skip_signing != 'true' }}
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:win
+
+      - name: Build unsigned Windows installer (testing)
+        if: ${{ github.event.inputs.skip_signing == 'true' }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:win
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StockScan-Windows-Installer
+          path: dist/StockScan-Setup-*.exe
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/StockScan-Setup-*.exe
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Optional: Build macOS (requires Apple Developer certificate)
+  # build-macos:
+  #   runs-on: macos-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with: { node-version: 20 }
+  #     - run: npm install
+  #     - run: npm run build:mac
+  #       env:
+  #         CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+  #         CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
