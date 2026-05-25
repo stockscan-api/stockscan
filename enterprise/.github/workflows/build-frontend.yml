@@ -19,7 +19,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: artisanbytecreafter/stockscan-frontend
+  IMAGE_NAME: axletime/stockscan-frontend
 
 jobs:
   build-and-push:

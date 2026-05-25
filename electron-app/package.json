@@ -28,7 +28,7 @@
   "build": {
     "appId": "uk.stockscan.desktop",
     "productName": "StockScan",
-    "copyright": "Copyright © 2026 StockScan Ltd",
+    "copyright": "Copyright \u00a9 2026 StockScan Ltd",
     "directories": {
       "output": "dist",
       "buildResources": "assets"
@@ -41,10 +41,19 @@
       "assets/**/*"
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon.ico",
       "publisherName": "StockScan Ltd",
-      "signingHashAlgorithms": ["sha256"]
+      "signingHashAlgorithms": [
+        "sha256"
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -59,19 +68,25 @@
       "artifactName": "StockScan-Setup-${version}.${ext}"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "assets/icon.icns",
       "category": "public.app-category.business"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "assets/icon.png",
       "category": "Office"
     },
     "publish": {
       "provider": "github",
-      "owner": "YOUR_GITHUB_USERNAME",
-      "repo": "stockscan-desktop"
+      "owner": "axletime",
+      "repo": "stockscan"
     }
   }
 }
