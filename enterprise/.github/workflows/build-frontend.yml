@@ -1,34 +1,25 @@
-# ──────────────────────────────────────────────────────────
-# StockScan Frontend — Docker Image Build & Push
-# ──────────────────────────────────────────────────────────
-# Triggers:
-#   - Push to main branch (auto-build latest)
-#   - Git tag v*.*.* (build versioned release)
-#   - Manual dispatch (with optional version override)
+# Build and push the StockScan frontend Docker image to GitHub Container Registry
+# Triggers on version tags or manual dispatch
 #
-# Pushes images to GitHub Container Registry (ghcr.io)
-# ──────────────────────────────────────────────────────────
+# The published image can be pulled by enterprise customers:
+#   docker pull ghcr.io/artisanbytecreafter/stockscan-frontend:latest
 
-name: Build & Push Frontend Image
+name: Build Frontend Docker Image
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'nextjs_space/**'
-      - 'enterprise/Dockerfile.frontend'
-  tags:
-    - 'v*.*.*'
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Image version tag (e.g., 1.0.0)'
+      tag:
+        description: 'Image tag (e.g., 1.0.0, latest)'
         required: false
         default: 'latest'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/stockscan-frontend
+  IMAGE_NAME: artisanbytecreafter/stockscan-frontend
 
 jobs:
   build-and-push:
@@ -38,7 +29,7 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
@@ -51,21 +42,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
+      - name: Extract version tag
         id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            # Tag with 'latest' on main branch push
-            type=raw,value=latest,enable={{is_default_branch}}
-            # Tag with version from git tag (v1.2.3 → 1.2.3)
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            # Tag with manual version input
-            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            # Tag with short SHA for traceability
-            type=sha,prefix=sha-
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_OUTPUT
+          else
+            TAG="${{ github.event.inputs.tag || 'latest' }}"
+            echo "version=$TAG" >> $GITHUB_OUTPUT
+            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$TAG" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -74,20 +62,8 @@ jobs:
           file: ./enterprise/Dockerfile.frontend
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            BACKEND_API_URL=http://localhost:3000
-            NEXTAUTH_URL=http://localhost:3100
-
-  # ── Optional: Notify on completion ──
-  notify:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Build result
-        run: |
-          echo "Build status: ${{ needs.build-and-push.result }}"
-          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+            NEXT_OUTPUT_MODE=standalone
+            NEXT_DIST_DIR=.next
