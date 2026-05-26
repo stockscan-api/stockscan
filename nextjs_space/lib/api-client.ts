@@ -1139,6 +1139,38 @@ class ApiClient {
   async deletePurchaseOrder(id: string) {
     return this.request<any>(`/api/purchase-orders/${id}`, { method: 'DELETE' });
   }
+
+  // === Enterprise Setup APIs ===
+
+  async checkHealth() {
+    return this.request<{ status: string; timestamp: string; services: Record<string, any> }>('/api/health');
+  }
+
+  async getSetupStatus() {
+    return this.request<{ standalone: boolean; setupRequired: boolean; message: string }>('/api/setup/status');
+  }
+
+  async validateLicense(key: string) {
+    return this.request<{ valid: boolean; tier?: string; duration?: string; reason?: string }>(
+      `/api/setup/validate-license?key=${encodeURIComponent(key)}`
+    );
+  }
+
+  async completeSetup(data: {
+    companyName: string;
+    companyEmail?: string;
+    companyPhone?: string;
+    companyAddress?: string;
+    ownerEmail: string;
+    ownerName: string;
+    ownerPassword: string;
+    licenseKey: string;
+  }) {
+    return this.request<{ success: boolean; token: string; user: any; subscription: any }>(
+      '/api/setup/complete',
+      { method: 'POST', body: JSON.stringify(data) }
+    );
+  }
 }
 
 export const apiClient = new ApiClient();

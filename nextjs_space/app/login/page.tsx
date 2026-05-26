@@ -45,6 +45,24 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, authLoading, isSuperAdmin, router]);
 
+  // Check if enterprise setup is needed
+  useEffect(() => {
+    if (authLoading || isAuthenticated) return;
+    let cancelled = false;
+    const checkSetup = async () => {
+      try {
+        const status = await apiClient.getSetupStatus();
+        if (!cancelled && status.setupRequired) {
+          router.replace('/setup');
+        }
+      } catch {
+        // If setup status check fails (e.g. SaaS mode, no setup endpoint), stay on login
+      }
+    };
+    checkSetup();
+    return () => { cancelled = true; };
+  }, [authLoading, isAuthenticated, router]);
+
   const handleRequestResetCode = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!resetEmail.trim()) {
