@@ -85,7 +85,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "axletime",
+      "owner": "stockscan-api",
       "repo": "stockscan"
     }
   }

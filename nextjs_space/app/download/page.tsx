@@ -255,7 +255,7 @@ export default function DownloadPage() {
                           ))}
                         </div>
                         <div className="flex items-center gap-3 mt-4">
-                          <a href="https://github.com/axletime/stockscan/releases/latest/download/StockScan-Setup-1.0.0.exe" target="_blank" rel="noopener noreferrer">
+                          <a href="https://github.com/stockscan-api/stockscan/releases/latest/download/StockScan-Setup-1.0.0.exe" target="_blank" rel="noopener noreferrer">
                             <Button className="bg-slate-800 hover:bg-slate-900 text-white">
                               <Download className="h-4 w-4 mr-2" /> Download StockScan Setup
                             </Button>

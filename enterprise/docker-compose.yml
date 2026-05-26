@@ -13,7 +13,7 @@
 
 services:
   stockscan-frontend:
-    image: ghcr.io/axletime/stockscan-frontend:latest
+    image: ghcr.io/stockscan-api/stockscan-frontend:latest
     ports:
       - "3100:3000"
     env_file:
