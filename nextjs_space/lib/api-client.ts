@@ -1166,9 +1166,16 @@ class ApiClient {
     ownerPassword: string;
     licenseKey: string;
   }) {
-    return this.request<{ success: boolean; token: string; user: any; subscription: any }>(
+    return this.request<{ success: boolean; token: string; user: any; subscription: any; activationMode?: string }>(
       '/api/setup/complete',
       { method: 'POST', body: JSON.stringify(data) }
+    );
+  }
+
+  async verifyLicense() {
+    return this.request<{ valid: boolean; status?: string; tier?: string; expiresAt?: string; lastVerifiedAt?: string; message?: string }>(
+      '/api/setup/verify-license',
+      { method: 'POST' }
     );
   }
 }

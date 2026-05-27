@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { apiClient } from '@/lib/api-client';
-import { Key, CheckCircle, Package, Users, MapPin, Loader2, Crown, AlertTriangle, Zap } from 'lucide-react';
+import { Key, CheckCircle, Package, Users, MapPin, Loader2, Crown, AlertTriangle, Zap, RefreshCw, Globe, WifiOff, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -64,6 +64,8 @@ export default function SubscriptionPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [licenseKey, setLicenseKey] = useState('');
   const [isActivating, setIsActivating] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{ valid: boolean; status?: string; lastVerifiedAt?: string; message?: string } | null>(null);
 
   const isOwner = hasRole(['OWNER']);
 
@@ -98,6 +100,27 @@ export default function SubscriptionPage() {
       toast.error(error.message || 'Failed to activate license');
     } finally {
       setIsActivating(false);
+    }
+  };
+
+  const handleVerifyLicense = async () => {
+    setIsVerifying(true);
+    setVerifyResult(null);
+    try {
+      const result = await apiClient.verifyLicense();
+      setVerifyResult(result);
+      if (result.valid) {
+        toast.success(result.message || 'License verified successfully');
+        loadTierLimits(); // Refresh tier data
+      } else {
+        toast.error(result.message || 'License verification failed');
+      }
+    } catch (error: any) {
+      const msg = error?.message || 'Unable to verify license';
+      setVerifyResult({ valid: false, message: msg });
+      toast.error(msg);
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -262,6 +285,64 @@ export default function SubscriptionPage() {
                   </form>
                   <p className="text-sm text-gray-500 mt-2">
                     License keys are provided by your administrator or can be purchased.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* License Verification (Owner only — Enterprise standalone) */}
+            {isOwner && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-green-600" />
+                    License Verification
+                  </CardTitle>
+                  <CardDescription>
+                    Verify your license with the StockScan license server
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button
+                    onClick={handleVerifyLicense}
+                    disabled={isVerifying}
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                  >
+                    {isVerifying ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verifying...</>
+                    ) : (
+                      <><RefreshCw className="h-4 w-4 mr-2" /> Verify Now</>
+                    )}
+                  </Button>
+                  {verifyResult && (
+                    <div className={`rounded-lg p-3 text-sm flex items-start gap-2 ${
+                      verifyResult.valid
+                        ? 'bg-green-50 border border-green-200 text-green-800'
+                        : 'bg-red-50 border border-red-200 text-red-800'
+                    }`}>
+                      {verifyResult.valid ? (
+                        <Globe className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <WifiOff className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      )}
+                      <div>
+                        <p className="font-medium">
+                          {verifyResult.valid ? 'License verified' : 'Verification failed'}
+                        </p>
+                        {verifyResult.message && (
+                          <p className="text-xs mt-0.5 opacity-80">{verifyResult.message}</p>
+                        )}
+                        {verifyResult.lastVerifiedAt && (
+                          <p className="text-xs mt-0.5 opacity-60">
+                            Last verified: {new Date(verifyResult.lastVerifiedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    This checks your license status with the StockScan cloud server. If your server has no internet access, your license remains valid for up to 45 days.
                   </p>
                 </CardContent>
               </Card>

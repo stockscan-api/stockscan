@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label';
 import {
   Loader2, KeyRound, Building2, UserPlus, CheckCircle2, AlertCircle,
-  ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Server, Sparkles
+  ArrowRight, ArrowLeft, Eye, EyeOff, Shield, Server, Sparkles, Wifi, WifiOff, Globe
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiClient } from '@/lib/api-client';
@@ -50,6 +50,7 @@ export default function SetupPage() {
 
   // Completion
   const [completionError, setCompletionError] = useState('');
+  const [activationMode, setActivationMode] = useState<string | null>(null);
 
   // Check if setup is needed on mount
   useEffect(() => {
@@ -131,11 +132,12 @@ export default function SetupPage() {
         if (result.user) {
           localStorage.setItem('user', JSON.stringify(result.user));
         }
+        setActivationMode(result.activationMode || null);
         setStep('done');
         toast.success('Setup complete! Redirecting to dashboard...');
         setTimeout(() => {
           window.location.href = '/dashboard';
-        }, 2000);
+        }, 3000);
       } else {
         throw new Error('Setup did not return expected response');
       }
@@ -186,6 +188,19 @@ export default function SetupPage() {
         <div className="text-center">
           <CheckCircle2 className="h-14 w-14 text-green-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">Setup Complete!</h2>
+          {activationMode && (
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium mb-3 ${
+              activationMode === 'online' || activationMode === 'cloud'
+                ? 'bg-green-500/20 text-green-300'
+                : 'bg-amber-500/20 text-amber-300'
+            }`}>
+              {activationMode === 'online' || activationMode === 'cloud' ? (
+                <><Globe className="h-3 w-3" /> Activated online</>
+              ) : (
+                <><WifiOff className="h-3 w-3" /> Offline activation (45-day grace period)</>
+              )}
+            </div>
+          )}
           <p className="text-slate-300 text-sm">Redirecting to your dashboard...</p>
         </div>
       </div>
