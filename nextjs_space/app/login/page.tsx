@@ -7,8 +7,9 @@ import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Eye, EyeOff, Loader2, Mail, KeyRound, ShieldCheck, ArrowLeft, X, Cloud, Building, Server } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, KeyRound, ShieldCheck, ArrowLeft, X, Cloud, Building, Server, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
 import { useServerConnection } from '@/contexts/server-connection-context';
 
@@ -248,7 +249,16 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
-          <div className="mt-4 pt-4 border-t border-gray-100 flex justify-center gap-4 text-xs text-gray-400">
+          <div className="mt-5 pt-4 border-t border-gray-100">
+            <Link
+              href="/register"
+              className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+            >
+              <UserPlus className="h-4 w-4" />
+              Register a New Company
+            </Link>
+          </div>
+          <div className="mt-3 flex justify-center gap-4 text-xs text-gray-400">
             <a href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</a>
             <span>·</span>
             <a href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</a>

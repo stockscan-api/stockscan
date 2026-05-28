@@ -111,6 +111,32 @@ class ApiClient {
     return JSON.parse(text);
   }
 
+  // Registration
+  async validateActivationCode(code: string) {
+    return this.request<{ valid: boolean; tier?: string; message?: string }>(`/api/product-codes/validate?code=${encodeURIComponent(code)}`);
+  }
+
+  async registerCompany(data: {
+    companyName: string;
+    companyEmail?: string;
+    companyPhone?: string;
+    companyAddress?: string;
+    email: string;
+    password: string;
+    name: string;
+    productCode: string;
+  }) {
+    const response = await this.request<{ token: string; user: any }>('/api/auth/register-company', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    this.setToken(response.token);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('user', JSON.stringify(response.user));
+    }
+    return response;
+  }
+
   // Auth
   async login(email: string, password: string) {
     const response = await this.request<{ token: string; user: any }>('/api/auth/login', {
