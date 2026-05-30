@@ -1050,10 +1050,17 @@ class ApiClient {
   async getCompanyProfile() {
     // Get current user's company from auth profile
     const profile = await this.request<any>('/api/auth/profile');
-    if (profile?.company) return profile.company;
-    if (profile?.companyId) {
-      return this.request<any>(`/api/company/${profile.companyId}`);
+    const companyId = profile?.company?.id || profile?.companyId;
+    if (companyId) {
+      // Always fetch full company details to ensure all fields (address, phone, email) are included
+      try {
+        return await this.request<any>(`/api/company/${companyId}`);
+      } catch {
+        // Fallback to profile.company if direct fetch fails
+        if (profile?.company) return profile.company;
+      }
     }
+    if (profile?.company) return profile.company;
     throw new Error('No company found');
   }
 
