@@ -1027,6 +1027,10 @@ class ApiClient {
     return this.request<any>(`/api/pos/sales/${saleId}/refund`, { method: 'POST', body: JSON.stringify(data || {}) });
   }
 
+  async updateSaleDate(saleId: string, data: { date: string; updateSaleNumber?: boolean }) {
+    return this.request<any>(`/api/pos/sales/${saleId}/date`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
   async getPosReceipt(saleId: string) {
     return this.request<any>(`/api/pos/receipt/${saleId}`);
   }

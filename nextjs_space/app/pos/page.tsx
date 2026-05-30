@@ -27,6 +27,7 @@ import {
   Pencil,
   Tag,
   Truck,
+  Calendar,
 } from 'lucide-react';
 
 interface CartItem {
@@ -76,6 +77,7 @@ type PosView = 'sell' | 'history' | 'receipt';
 export default function PosPage() {
   const { hasRole, user } = useAuth();
   const canRefund = hasRole(['MANAGER', 'OWNER']);
+  const canEditSaleDate = hasRole(['MANAGER', 'OWNER']);
   const [view, setView] = useState<PosView>('sell');
   const [products, setProducts] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -146,6 +148,13 @@ export default function PosPage() {
   const [isCreatingDeliveryNote, setIsCreatingDeliveryNote] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [refundingSaleId, setRefundingSaleId] = useState<string | null>(null);
+
+  // Edit sale date
+  const [showEditDateModal, setShowEditDateModal] = useState(false);
+  const [editDateSaleId, setEditDateSaleId] = useState<string | null>(null);
+  const [editDateValue, setEditDateValue] = useState('');
+  const [editDateUpdateSaleNumber, setEditDateUpdateSaleNumber] = useState(true);
+  const [isSavingDate, setIsSavingDate] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -1149,6 +1158,23 @@ export default function PosPage() {
                   <span>Total</span>
                   <span className="text-green-600">£{(selectedSale.total || 0).toFixed(2)}</span>
                 </div>
+                {/* Edit Sale Date Button (Owner/Manager only) */}
+                {canEditSaleDate && (
+                  <button
+                    onClick={() => {
+                      setEditDateSaleId(selectedSale.id);
+                      // Pre-fill with current sale date in DD/MM/YYYY
+                      const d = new Date(selectedSale.createdAt);
+                      setEditDateValue(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`);
+                      setEditDateUpdateSaleNumber(true);
+                      setShowEditDateModal(true);
+                    }}
+                    className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors font-medium text-sm"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    Edit Sale Date
+                  </button>
+                )}
                 {/* View Invoice Button */}
                 <button
                   onClick={() => viewSaleInvoice(selectedSale)}
@@ -1213,6 +1239,128 @@ export default function PosPage() {
                       <Truck className="h-4 w-4" />
                     )}
                     {isCreatingDeliveryNote ? 'Creating...' : 'Create Delivery Note'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Sale Date Modal */}
+        {showEditDateModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-sm w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-900">Edit Sale Date</h2>
+                <button onClick={() => { setShowEditDateModal(false); setEditDateSaleId(null); }} className="text-gray-500 hover:text-gray-700">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New Date (DD/MM/YYYY)</label>
+                  <input
+                    type="text"
+                    value={editDateValue}
+                    onChange={(e) => {
+                      // Allow only digits and slashes, auto-format
+                      let v = e.target.value.replace(/[^\d/]/g, '');
+                      // Auto-insert slashes
+                      const digits = v.replace(/\//g, '');
+                      if (digits.length >= 4 && !v.includes('/')) {
+                        v = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8);
+                      } else if (digits.length >= 2 && v.split('/').length < 2) {
+                        v = digits.slice(0, 2) + '/' + digits.slice(2);
+                      }
+                      setEditDateValue(v);
+                    }}
+                    placeholder="DD/MM/YYYY"
+                    maxLength={10}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-center font-mono text-lg tracking-wider focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                  />
+                  <div className="mt-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Or use date picker</label>
+                    <input
+                      type="date"
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const [y, m, d] = e.target.value.split('-');
+                          setEditDateValue(`${d}/${m}/${y}`);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editDateUpdateSaleNumber}
+                    onChange={(e) => setEditDateUpdateSaleNumber(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">Update sale number to match new date</span>
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setShowEditDateModal(false); setEditDateSaleId(null); }}
+                    disabled={isSavingDate}
+                    className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!editDateSaleId) return;
+                      // Parse DD/MM/YYYY to YYYY-MM-DD
+                      const parts = editDateValue.split('/');
+                      if (parts.length !== 3 || parts[0].length !== 2 || parts[1].length !== 2 || parts[2].length !== 4) {
+                        toast.error('Please enter date as DD/MM/YYYY');
+                        return;
+                      }
+                      const [dd, mm, yyyy] = parts;
+                      const dateObj = new Date(`${yyyy}-${mm}-${dd}`);
+                      if (isNaN(dateObj.getTime())) {
+                        toast.error('Invalid date');
+                        return;
+                      }
+                      const isoDate = `${yyyy}-${mm}-${dd}`;
+                      setIsSavingDate(true);
+                      try {
+                        const result = await apiClient.updateSaleDate(editDateSaleId, {
+                          date: isoDate,
+                          updateSaleNumber: editDateUpdateSaleNumber,
+                        });
+                        const updated = result?.sale || result;
+                        toast.success(`Sale date updated${updated?.saleNumber ? ` — ${updated.saleNumber}` : ''}`);
+                        // Update the selectedSale in-place
+                        if (selectedSale && selectedSale.id === editDateSaleId) {
+                          setSelectedSale({
+                            ...selectedSale,
+                            createdAt: updated?.createdAt || updated?.saleDate || `${isoDate}T00:00:00.000Z`,
+                            saleNumber: updated?.saleNumber || selectedSale.saleNumber,
+                          });
+                        }
+                        // Refresh sales list
+                        fetchSales();
+                        setShowEditDateModal(false);
+                        setEditDateSaleId(null);
+                      } catch (err: any) {
+                        toast.error(err?.message || 'Failed to update sale date');
+                      } finally {
+                        setIsSavingDate(false);
+                      }
+                    }}
+                    disabled={isSavingDate || !editDateValue}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm disabled:opacity-50"
+                  >
+                    {isSavingDate ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Calendar className="h-4 w-4" />
+                    )}
+                    {isSavingDate ? 'Saving...' : 'Save Date'}
                   </button>
                 </div>
               </div>
